@@ -1,9 +1,10 @@
 import { useRef, useState, useCallback } from "react";
 import { MapView } from "@rnmapbox/maps";
 import * as Location from "expo-location";
+import { useMapView } from "../contexts/MapViewContext";
 
 export function useMapControls() {
-  const mapRef = useRef<MapView>(null);
+  const { mapRef, cameraRef } = useMapView();
   const [compassMode, setCompassMode] = useState<"north" | "heading">("north");
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const lastUpdateTime = useRef(0);
@@ -13,21 +14,23 @@ export function useMapControls() {
     if (location && mapRef.current) {
       setIsFollowingUser(true);
       const heading = compassMode === "heading" ? lastHeading.current : 0;
-      (mapRef.current as any)?.setCamera({
-        centerCoordinate: [location.longitude, location.latitude],
-        zoomLevel: 16,
-        heading,
-        animationDuration: 600,
-      });
+      const cameraUpdate = { centerCoordinate: [location.longitude, location.latitude], zoomLevel: 16, heading, animationDuration: 600 };
+      if (cameraRef && cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+        cameraRef.current.setCamera(cameraUpdate);
+      } else {
+        (mapRef.current as any)?.setCamera(cameraUpdate);
+      }
     }
   };
 
   const animateToCoordinate = useCallback((coordinate: { latitude: number; longitude: number }) => {
     if (mapRef.current) {
-      (mapRef.current as any)?.setCamera({
-        centerCoordinate: [coordinate.longitude, coordinate.latitude],
-        animationDuration: 600,
-      });
+      const cameraUpdate = { centerCoordinate: [coordinate.longitude, coordinate.latitude], animationDuration: 600 };
+      if (cameraRef && cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+        cameraRef.current.setCamera(cameraUpdate);
+      } else {
+        (mapRef.current as any)?.setCamera(cameraUpdate);
+      }
     }
   }, []);
 
@@ -35,7 +38,12 @@ export function useMapControls() {
     setCompassMode(prev => {
       const newMode = prev === "north" ? "heading" : "north";
       const heading = newMode === "heading" ? lastHeading.current : 0;
-      (mapRef.current as any)?.setCamera({ heading, animationDuration: 0 });
+      const cameraUpdate = { heading, animationDuration: 0 };
+      if (cameraRef && cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+        cameraRef.current.setCamera(cameraUpdate);
+      } else {
+        (mapRef.current as any)?.setCamera(cameraUpdate);
+      }
       return newMode;
     });
   };
@@ -46,17 +54,24 @@ export function useMapControls() {
       if (now - lastUpdateTime.current > 500) {
         lastUpdateTime.current = now;
         lastHeading.current = heading;
-        (mapRef.current as any)?.setCamera({ heading, animationDuration: 200 });
+        const cameraUpdate = { heading, animationDuration: 200 };
+        if (cameraRef && cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+          cameraRef.current.setCamera(cameraUpdate);
+        } else {
+          (mapRef.current as any)?.setCamera(cameraUpdate);
+        }
       }
     }
   }, [compassMode]);
 
   const followUserLocation = useCallback((location: Location.LocationObjectCoords) => {
     if (mapRef.current && isFollowingUser) {
-      (mapRef.current as any)?.setCamera({
-        centerCoordinate: [location.longitude, location.latitude],
-        animationDuration: 500,
-      });
+      const cameraUpdate = { centerCoordinate: [location.longitude, location.latitude], animationDuration: 500 };
+      if (cameraRef && cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+        cameraRef.current.setCamera(cameraUpdate);
+      } else {
+        (mapRef.current as any)?.setCamera(cameraUpdate);
+      }
     }
   }, [isFollowingUser]);
 

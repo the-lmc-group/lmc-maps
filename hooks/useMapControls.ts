@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { MapView } from "@rnmapbox/maps";
 import * as Location from "expo-location";
+import { Dimensions } from "react-native";
 import { NominatimService } from "../services/NominatimService";
 import { useMapView } from "../contexts/MapViewContext";
 
@@ -14,12 +15,13 @@ export function useMapControls() {
     currentViewportPadding,
     setDrawerCameraControl,
     releaseDrawerCameraControl,
+    centerCoordinate,
   } = useMapView();
   const CONTROLLER_ID = 'useMapControls';
   const [compassMode, setCompassMode] = useState<"north" | "heading">("north");
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [navigationMode, setNavigationMode] = useState<"driving" | "walking">(
+  const [navigationMode, setNavigationMode] = useState<"driving" | "walking" | "bicycle" | "transit">(
     "driving"
   );
   const [showRecenterPrompt, setShowRecenterPrompt] = useState(false);
@@ -64,10 +66,23 @@ export function useMapControls() {
 
       let pitch = 0;
       let zoom = 16;
-  let animationDuration = navigationMode === "driving" ? 250 : 400;
+      let animationDuration = navigationMode === "driving" ? 250 : 400;
+
+      const targetCenter: [number, number] = [userLocation.longitude, userLocation.latitude];
+
+      if (centerCoordinate) {
+        const distance = calculateDistance(
+          centerCoordinate[1], centerCoordinate[0],
+          targetCenter[1], targetCenter[0]
+        );
+        if (distance > 50) {
+          const speedUp = Math.min(150, distance / 2);
+          animationDuration = Math.max(100, animationDuration - speedUp);
+        }
+      }
 
       let cameraConfig: any = {
-        centerCoordinate: [userLocation.longitude, userLocation.latitude],
+        centerCoordinate: targetCenter,
         pitch: pitch,
         zoomLevel: zoom,
         animationDuration: animationDuration,
@@ -116,14 +131,16 @@ export function useMapControls() {
       } else {
         if (compassMode === "north") {
           cameraConfig.heading = 0;
+        } else {
+          cameraConfig.heading = userLocation.heading || 0;
         }
       }
 
-  setCameraConfig(cameraConfig, true, CONTROLLER_ID);
+      setCameraConfig(cameraConfig, true, CONTROLLER_ID);
 
       lastIntersectionDistance.current = distanceToNextStep || 1000;
     },
-    [isNavigating, navigationMode, compassMode, setCameraConfig]
+    [isNavigating, navigationMode, compassMode, setCameraConfig, centerCoordinate]
   );
 
   const startWalkingNavigation = useCallback(() => {
@@ -136,16 +153,28 @@ export function useMapControls() {
     setNavigationMode("driving");
   }, []);
 
-  const startNavigationForMode = useCallback((mode: "driving" | "walking") => {
+  const startBicycleNavigation = useCallback(() => {
+    setIsNavigating(true);
+    setNavigationMode("bicycle");
+  }, []);
+
+  const startTransitNavigation = useCallback(() => {
+    setIsNavigating(true);
+    setNavigationMode("transit");
+  }, []);
+
+  const startNavigationForMode = useCallback((mode: "driving" | "walking" | "bicycle" | "transit") => {
     setIsNavigating(true);
     setNavigationMode(mode);
     setIsFollowingUser(true);
     setShowRecenterPrompt(false);
+    setCompassMode("heading");
   }, []);
 
   const stopNavigation = useCallback(() => {
     setIsNavigating(false);
     setShowRecenterPrompt(false);
+    setCompassMode("north");
 
     if (recenterTimeout.current) {
       clearTimeout(recenterTimeout.current);
@@ -338,7 +367,8 @@ export function useMapControls() {
     startCoordinate: { latitude: number; longitude: number },
     endCoordinate: { latitude: number; longitude: number },
     routeCoords: { latitude: number; longitude: number }[] = [],
-    drawerVisible: boolean = false
+    drawerVisible: boolean = false,
+    drawerHeight?: number
   ) => {
     const coordinates: [number, number][] = [
       [startCoordinate.longitude, startCoordinate.latitude],
@@ -350,7 +380,8 @@ export function useMapControls() {
 
     let viewportPadding = currentViewportPadding;
     if (drawerVisible) {
-      viewportPadding = { ...currentViewportPadding, bottom: 400 };
+      const bottomPadding = drawerHeight || currentViewportPadding.bottom || 400;
+      viewportPadding = { ...currentViewportPadding, bottom: bottomPadding };
     }
 
     if (!coordinates || coordinates.length === 0) return;
@@ -371,7 +402,18 @@ export function useMapControls() {
 
     const latDiff = maxLat - minLat;
     const lonDiff = maxLon - minLon;
-    const verticalPaddingFactor = 1 + (viewportPadding.bottom || 0) / 400;
+    
+    const { height: screenHeight } = Dimensions.get("window");
+    const bottomPaddingPixels = viewportPadding.bottom || 0;
+    const HEADER_HEIGHT = 80;
+    const totalDrawerHeight = bottomPaddingPixels + HEADER_HEIGHT;
+    
+    const verticalShiftRatio = totalDrawerHeight / screenHeight;
+    const verticalShiftFactor = verticalShiftRatio * latDiff * 1.2;
+    
+    const adjustedCenterLat = centerLat - verticalShiftFactor;
+    
+    const verticalPaddingFactor = 1.8;
     const horizontalPaddingFactor = 1 + (viewportPadding.left || 0) / 400;
 
     const adjustedLatDiff = latDiff * verticalPaddingFactor;
@@ -393,7 +435,7 @@ export function useMapControls() {
 
     setCameraConfig(
       {
-        centerCoordinate: [centerLon, centerLat],
+        centerCoordinate: [centerLon, adjustedCenterLat],
         zoomLevel: zoom,
         animationDuration: 1500,
       },
@@ -488,6 +530,8 @@ export function useMapControls() {
     navigationMode,
     startWalkingNavigation,
     startDrivingNavigation,
+    startBicycleNavigation,
+    startTransitNavigation,
     startNavigationForMode,
     stopNavigation,
     adjustNavigationCamera,

@@ -22,6 +22,7 @@ export interface NavigationStep {
   coordinates: [number, number];
   direction?: string;
   streetName?: string;
+  text?: string;
 }
 
 export interface NavigationState {

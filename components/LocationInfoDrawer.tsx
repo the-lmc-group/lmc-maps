@@ -19,6 +19,9 @@ import { FavoritesService } from '../services/FavoritesService';
 import { SpeedLimitService } from '../services/SpeedLimitService';
 import * as Location from 'expo-location';
 import { NominatimService, NominatimReverseResult } from '../services/NominatimService';
+import PlusCodeService from '@/services/PlusCodeService';
+import PrimTransportService from '../services/IleDeFranceMobilite';
+import TransitStopDrawer from './TransitStopDrawer';
 
 interface Coordinate {
   latitude: number;
@@ -41,6 +44,7 @@ interface LocationInfoDrawerProps {
   onStartRoute: (coordinate: Coordinate) => void;
   hasActiveRoute?: boolean;
   onShowLocationPoint?: (show: boolean) => void;
+  onBlockLocationInfo?: (v: boolean) => void;
 }
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -54,6 +58,7 @@ export default function LocationInfoDrawer({
   onStartRoute,
   hasActiveRoute = false,
   onShowLocationPoint,
+  onBlockLocationInfo,
 }: LocationInfoDrawerProps) {
   const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
   const [photos, setPhotos] = useState<PlacePhoto[]>([]);
@@ -65,6 +70,8 @@ export default function LocationInfoDrawer({
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
   const [speedLimit, setSpeedLimit] = useState<string | null>(null);
+  const [showTransitDrawer, setShowTransitDrawer] = useState(false);
+  const [isTransitStop, setIsTransitStop] = useState(false);
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
     if (visible) {
@@ -174,9 +181,25 @@ continue;
     setLoading(true);
     setError(null);
     setLocationInfo(null);
+    setIsTransitStop(false);
     setPhotos([]);
 
     try {
+      const departures = await PrimTransportService.fetchDeparturesByCoords(
+        coord.latitude, 
+        coord.longitude, 
+        100
+      );
+
+      if (departures && departures.length > 0) {
+        setIsTransitStop(true);
+        setLoading(false);
+        onClose();
+        if (onBlockLocationInfo) onBlockLocationInfo(true);
+        setShowTransitDrawer(true);
+        return;
+      }
+
       const result = await NominatimService.reverse(
         coord.latitude, 
         coord.longitude, 
@@ -293,6 +316,17 @@ continue;
     
   };
 
+  const handleCopyPlusCode = () => {
+    if (!coordinate) return;
+    try {
+      const code = PlusCodeService.encode(coordinate.latitude, coordinate.longitude, 10);
+      Clipboard.setString(code);
+      Vibration.vibrate(50);
+      setShowCopyModal(false);
+    } catch (e) {
+    }
+  };
+
   useEffect(() => {
     if (coordinate) {
       fetchLocationInfo(coordinate);
@@ -400,6 +434,7 @@ continue;
   if (!visible) return null;
 
   return (
+    <>
     <Animated.View
       style={[
         styles.container,
@@ -570,6 +605,9 @@ continue;
         <View style={styles.alertOverlay}>
           <View style={styles.copyModalContainer}>
             <View style={styles.copyModalHeader}>
+              <TouchableOpacity onPress={() => setShowCopyModal(false)} style={styles.backButton}>
+                <Icon name="arrow-back" size={22} color="#007AFF" />
+              </TouchableOpacity>
               <Icon name="content-copy" size={24} color="#007AFF" />
               <Text style={styles.copyModalTitle}>Copier les coordonnées</Text>
             </View>
@@ -617,6 +655,19 @@ continue;
             </TouchableOpacity>
 
             <TouchableOpacity 
+              style={styles.copyFormatButton}
+              onPress={handleCopyPlusCode}
+            >
+              <View style={styles.copyFormatContent}>
+                <Text style={styles.copyFormatTitle}>Plus Code (complet)</Text>
+                <Text style={styles.copyFormatExample}>
+                  {coordinate ? PlusCodeService.encode(coordinate.latitude, coordinate.longitude, 10) : '8FVC9G8F+6X'}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={20} color="#666" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={styles.copyModalCancelButton}
               onPress={() => setShowCopyModal(false)}
             >
@@ -655,6 +706,19 @@ continue;
         </View>
       )}
     </Animated.View>
+
+    <TransitStopDrawer
+      visible={showTransitDrawer}
+      coordinate={coordinate}
+      onClose={() => {
+        setShowTransitDrawer(false);
+        if (onBlockLocationInfo) onBlockLocationInfo(false);
+      }}
+      onStartRoute={onStartRoute}
+      hasActiveRoute={hasActiveRoute}
+      onShowLocationPoint={onShowLocationPoint}
+    />
+  </>
   );
 }
 
@@ -957,6 +1021,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  backButton: {
+    marginRight: 6,
+    padding: 4,
   },
   copyModalTitle: {
     fontSize: 18,

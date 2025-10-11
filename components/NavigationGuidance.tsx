@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   useWindowDimensions,
+  StatusBar,
+  Platform,
 } from "react-native";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import NavigationService from "../services/NavigationService";
@@ -77,6 +79,7 @@ export default function NavigationGuidance({
   const [showMenu, setShowMenu] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(false);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [loadedRouteData, setLoadedRouteData] = useState<any>(null);
   const [recenterRemainingMs, setRecenterRemainingMs] = useState<number | null>(
     null
@@ -190,6 +193,9 @@ export default function NavigationGuidance({
         if (key !== lastKeyState.current) {
           lastKeyState.current = key;
           setNavigationState(state);
+          if (state.isNavigating && state.steps.length > 0) {
+            setIsInitialLoading(false);
+          }
         }
       } catch (e) {
         setNavigationState(state);
@@ -202,6 +208,12 @@ export default function NavigationGuidance({
       NavigationService.removeListener(handleStateChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (visible) {
+      setIsInitialLoading(true);
+    }
+  }, [visible]);
 
   const effectiveIsOffRoute = typeof isOffRouteOverride === 'boolean' ? isOffRouteOverride : navigationState.isOffRoute;
 
@@ -455,10 +467,10 @@ export default function NavigationGuidance({
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       {}
       <SafeAreaView>
-        {isLoadingRoute ? (
+        {(isLoadingRoute || isInitialLoading) ? (
           <View style={styles.loadingTopGuidance}>
             <ActivityIndicator size="small" color="#007AFF" />
-            <Text style={styles.loadingText}>Chargement de l'itinéraire</Text>
+            <Text style={styles.loadingText}>Calcul de l'itinéraire</Text>
           </View>
         ) : (
           <View style={styles.topGuidance}>
@@ -711,7 +723,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginHorizontal: 12,
-    marginTop: 12,
+    marginTop: (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 44) + 12,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: {
@@ -737,7 +749,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginHorizontal: 12,
-    marginTop: 12,
+    marginTop: (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 44) + 12,
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -972,4 +984,3 @@ const styles = StyleSheet.create({
     width: "50%",
   },
 });
-

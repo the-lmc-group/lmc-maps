@@ -40,7 +40,7 @@ interface MapContainerProps {
   selectedPOI?: OverpassPOI | null;
   isFirstLoad?: boolean;
   isNavigating?: boolean;
-  navigationMode?: "driving" | "walking";
+  navigationMode?: "driving" | "walking" | "bicycle" | "transit";
   showDirectLine?: boolean;
   navigationSteps?: NavigationStep[];
   currentStepIndex?: number;
@@ -60,12 +60,15 @@ interface MapContainerProps {
   previewMarkerCoordinate?: Coordinate | null;
   previewMarkerBearing?: number;
   gpxRouteCoords?: Coordinate[];
+  temporaryMarker?: Coordinate | null;
   alternativeRoutes?: Array<{
     coords: Coordinate[];
     duration?: number;
     distance?: number;
   }>;
   selectedAlternativeIndex?: number;
+  onUserLocationPress?: () => void;
+  onParkingPress?: () => void;
 }
 
 export default function MapContainer({
@@ -103,6 +106,9 @@ export default function MapContainer({
   gpxRouteCoords = [],
   alternativeRoutes = [],
   selectedAlternativeIndex = 0,
+  onUserLocationPress,
+  onParkingPress,
+  temporaryMarker,
 }: MapContainerProps) {
   const {
     mapRef,
@@ -112,6 +118,7 @@ export default function MapContainer({
     setPitch,
     setCameraConfig,
     notifyMapReady,
+    cameraRef,
   } = useMapView();
   const { heading: mapHeading } = useMapView();
 
@@ -131,6 +138,7 @@ export default function MapContainer({
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const [isMapReady, setIsMapReady] = useState(false);
+  const [annotationsReady, setAnnotationsReady] = useState(false);
   const [mapBearing, setMapBearing] = useState(0);
   const lastCameraUpdateRef = useRef<{
     latitude: number;
@@ -140,20 +148,14 @@ export default function MapContainer({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMovedRef = useRef(false);
   const [useOverlayMarker, setUseOverlayMarker] = useState(false);
+  const suppressNextMapPressRef = useRef(false);
 
   useEffect(() => {
     try {
       const rotation = getArrowRotation();
     } catch (e) {
     }
-  }, [
-    heading,
-    currentHeading,
-    compassMode,
-    mapBearing,
-    isNavigating,
-    routeDirection,
-  ]);
+  }, [heading, currentHeading, compassMode, mapBearing, isNavigating, routeDirection]);
 
   const calculateDistance = (
     lat1: number,
@@ -316,12 +318,15 @@ export default function MapContainer({
   const handleMapReady = () => {
     setTimeout(() => {
       setIsMapReady(true);
+      setTimeout(() => setAnnotationsReady(true), 120);
       try {
         if (notifyMapReady) notifyMapReady();
       } catch (e) {
       }
     }, 50);
   };
+
+  const renderAnnotations = isMapReady && annotationsReady;
 
   useEffect(() => {
     const loadLastPosition = async () => {
@@ -445,7 +450,7 @@ export default function MapContainer({
             ]),
           },
         }
-      : location && destination && showDirectLine
+      : location && destination && showDirectLine && routeCoords.length === 0
       ? {
           type: "Feature" as const,
           properties: {},
@@ -557,6 +562,11 @@ export default function MapContainer({
   }
 
   const handleMapPress = async (event: any) => {
+    if (suppressNextMapPressRef.current) {
+      suppressNextMapPressRef.current = false;
+      return;
+    }
+    if (isNavigating) return;
     try {
       let coords: number[] | null = null;
 
@@ -601,6 +611,24 @@ export default function MapContainer({
 
       if (coords && coords.length >= 2) {
         const [longitude, latitude] = coords;
+        if (
+          location &&
+          isFinite(location.latitude) &&
+          isFinite(location.longitude)
+        ) {
+          const d = calculateDistance(
+            location.latitude,
+            location.longitude,
+            latitude,
+            longitude
+          );
+          const z = typeof zoomLevel === 'number' ? zoomLevel : 15;
+          const threshold = Math.max(3, Math.min(20, 0.8 * Math.pow(2, 15 - z)));
+          if (d <= threshold) {
+            if (onUserLocationPress && !isNavigating) onUserLocationPress();
+            return;
+          }
+        }
         onLongPress({ latitude, longitude });
         return;
       }
@@ -691,6 +719,7 @@ export default function MapContainer({
         >
           {isMapReady && (
             <Camera
+              ref={cameraRef}
               centerCoordinate={centerCoordinate || initialCenter}
               zoomLevel={zoomLevel}
               pitch={pitch}
@@ -781,6 +810,24 @@ export default function MapContainer({
               </ShapeSource>
             )}
 
+          {isMapReady &&
+            isNavigating &&
+            (navigationMode === "walking" || navigationMode === "bicycle") &&
+            routeCoords.length > 0 &&
+            (!completedRouteGeoJSON && !remainingRouteGeoJSON) && (
+              <ShapeSource id={`pedestrian-route-${instanceId}`} shape={routeGeoJSON}>
+                <LineLayer
+                  id={`pedestrian-route-layer-${instanceId}`}
+                  style={{
+                    lineColor: navigationMode === "bicycle" ? "#00AA00" : "#007AFF",
+                    lineWidth: 4,
+                    lineCap: "round",
+                    lineJoin: "round",
+                  }}
+                />
+              </ShapeSource>
+            )}
+
           {isMapReady && directLineGeoJSON && (
             <ShapeSource id={directLineSourceId} shape={directLineGeoJSON}>
               <LineLayer
@@ -840,7 +887,7 @@ export default function MapContainer({
             </>
           )}
 
-          {isMapReady && isValidCoordObj(destination) && (
+          {renderAnnotations && isValidCoordObj(destination) && (
             <PointAnnotation
               id="destination"
               coordinate={[destination.longitude, destination.latitude]}
@@ -850,7 +897,7 @@ export default function MapContainer({
               </View>
             </PointAnnotation>
           )}
-          {isMapReady &&
+          {renderAnnotations &&
             showLocationPoint &&
             isValidCoordObj(selectedLocationCoordinate) && (
               <PointAnnotation
@@ -865,7 +912,7 @@ export default function MapContainer({
                 </View>
               </PointAnnotation>
             )}
-          {isMapReady &&
+          {renderAnnotations &&
             location &&
             isFinite(location.longitude) &&
             isFinite(location.latitude) &&
@@ -875,6 +922,10 @@ export default function MapContainer({
                 id="user-location-arrow"
                 coordinate={[location.longitude, location.latitude]}
                 anchor={{ x: 0.5, y: 0.5 }}
+                onSelected={() => {
+                  suppressNextMapPressRef.current = true;
+                  if (!isNavigating && onUserLocationPress) onUserLocationPress();
+                }}
               >
                 <UserLocationMarker
                   location={location}
@@ -883,7 +934,7 @@ export default function MapContainer({
                 />
               </PointAnnotation>
             )}
-          {isMapReady && isValidCoordObj(previewMarkerCoordinate) && (
+          {renderAnnotations && isValidCoordObj(previewMarkerCoordinate) && (
             <PointAnnotation
               id="gpx-preview-arrow"
               coordinate={[
@@ -903,7 +954,18 @@ export default function MapContainer({
               </View>
             </PointAnnotation>
           )}
-          {isMapReady &&
+          {renderAnnotations && temporaryMarker && isValidCoordObj(temporaryMarker) && (
+            <PointAnnotation
+              id="temporary-marker"
+              coordinate={[temporaryMarker.longitude, temporaryMarker.latitude]}
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              <View collapsable={false} style={styles.temporaryMarker}>
+                <MaterialIcons name="place" size={32} color="#007AFF" />
+              </View>
+            </PointAnnotation>
+          )}
+          {renderAnnotations &&
             selectedParking &&
             isValidCoordObj(selectedParking.coordinate) && (
               <PointAnnotation
@@ -912,6 +974,9 @@ export default function MapContainer({
                   selectedParking.coordinate.longitude,
                   selectedParking.coordinate.latitude,
                 ]}
+                onSelected={() => {
+                  if (!isNavigating && onParkingPress) onParkingPress();
+                }}
               >
                 <View collapsable={false} style={styles.parkingMarker}>
                   <MaterialIcons
@@ -922,7 +987,7 @@ export default function MapContainer({
                 </View>
               </PointAnnotation>
             )}
-          {isMapReady &&
+          {renderAnnotations &&
             pois
               .filter(
                 (poi) =>
@@ -948,7 +1013,7 @@ export default function MapContainer({
               ))}
 
           {}
-          {isMapReady &&
+          {renderAnnotations &&
             selectedPOI &&
             selectedPOI.lat != null &&
             selectedPOI.lon != null && (
@@ -1043,9 +1108,9 @@ export default function MapContainer({
                   id={`navigation-step-${index}`}
                   coordinate={coord}
                   onSelected={() => {
-                    if (onNavigationStepPress) {
-                      onNavigationStepPress(index, step);
-                    }
+                      if (!isNavigating && onNavigationStepPress) {
+                        onNavigationStepPress(index, step);
+                      }
                   }}
                 >
                   <View
@@ -1330,6 +1395,20 @@ const styles = StyleSheet.create({
     zIndex: 999,
     elevation: 20,
     pointerEvents: "none",
+  },
+  temporaryMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(0,122,255,0.06)',
+    borderRadius: 22,
+    zIndex: 9999,
+    elevation: 30,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
 });
 

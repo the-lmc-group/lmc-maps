@@ -5,31 +5,35 @@ import {
   View,
   TouchableOpacity,
   Text,
-  FlatList,
-  Animated,
-  Dimensions,
-  SafeAreaView,
   Modal,
-  Vibration,
+  SafeAreaView,
+  Animated,
+  FlatList,
   LayoutAnimation,
   UIManager,
   Platform,
+  Dimensions,
   useWindowDimensions,
+  Vibration,
 } from "react-native";
-import { MaterialIcons as Icon } from "@expo/vector-icons";
-import SettingsOverlay from "./SettingsOverlay";
-import {
-  NominatimService,
-  NominatimSearchResult,
-} from "../services/NominatimService";
-import { FavoritesService } from '../services/FavoritesService';
-import {
-  RouteHistoryService,
-} from "../services/RouteHistoryService";
+import { MaterialIcons as Icon } from '@expo/vector-icons';
+import SearchResultDrawer from './SearchResultDrawer';
+import OverPassAmenityList, { AmenityType } from "../assets/overpass/amenityList";
+import { FavoritesService } from "../services/FavoritesService";
+import { RouteHistoryService } from "../services/RouteHistoryService";
+import { NominatimService, NominatimSearchResult } from "../services/NominatimService";
 import { OverpassService, OverpassPOI } from "../services/OverpassService";
-import OverPassAmenityList, {
-  AmenityType,
-} from "../assets/overpass/amenityList";
+import SettingsOverlay from './SettingsOverlay';
+import PlusCodeService from "@/services/PlusCodeService";
+
+const formatDistance = (km?: number) => {
+  if (km == null) return "";
+  if (km < 1) {
+    const m = Math.round(km * 1000);
+    return `${m} m`;
+  }
+  return `${(Math.round(km * 10) / 10).toFixed(1)} km`;
+};
 
 const SearchResultItem = memo(
   ({
@@ -55,6 +59,96 @@ const SearchResultItem = memo(
     getCategoryColor: (type: AmenityType) => string;
     onDeleteHistoryItem: (id: string) => void;
   }) => {
+    const getIconForResult = (item: SearchResult) => {
+      const amenity = (item.amenityType || "").toLowerCase();
+      const title = (item.title || "").toLowerCase();
+      const subtitle = (item.subtitle || "").toLowerCase();
+      const type = item.type;
+
+      if (type === 'history') return 'history';
+      const map: Record<string, string> = {
+        restaurant: 'local-dining',
+        bar: 'local-dining',
+        cafe: 'local-cafe',
+        'café': 'local-cafe',
+        fast_food: 'fastfood',
+        pub: 'local-dining',
+        bakery: 'local-dining',
+        supermarket: 'local-grocery-store',
+        grocery: 'local-grocery-store',
+        'convenience': 'local-grocery-store',
+        fuel: 'local-gas-station',
+        'gas_station': 'local-gas-station',
+        parking: 'local-parking',
+        'car_park': 'local-parking',
+        hospital: 'local-hospital',
+        clinic: 'local-hospital',
+        pharmacy: 'local-hospital',
+        atm: 'local-atm',
+        bank: 'account-balance',
+        hotel: 'local-hotel',
+        motel: 'local-hotel',
+        hostel: 'local-hotel',
+        cinema: 'local-movies',
+        theatre: 'theaters',
+  library: 'local-library',
+        school: 'school',
+        university: 'school',
+        bus_stop: 'directions-bus',
+        bus_station: 'directions-bus',
+        train_station: 'train',
+        tram_stop: 'tram',
+        subway_station: 'subway',
+        parking_entrance: 'local-parking',
+        bicycle_rental: 'directions-bike',
+        car_rental: 'local-taxi',
+        police: 'security',
+        fire_station: 'whatshot',
+        post_office: 'local-post-office',
+        'place_of_worship': 'place',
+        church: 'church',
+        mosque: 'place',
+        synagogue: 'place',
+        park: 'park',
+        zoo: 'pets',
+        art_gallery: 'palette',
+        museum: 'museum',
+        taxi: 'local-taxi'
+      };
+
+      if (amenity && map[amenity]) return map[amenity];
+
+      const keywordsMap: Array<{ keys: string[]; icon: string }> = [
+        { keys: ['gare', 'station', 'train', 'rail'], icon: 'train' },
+        { keys: ['restaurant', 'resto', 'brasserie', 'bistro', 'pub'], icon: 'local-dining' },
+        { keys: ['café', 'cafe', 'coffee', 'espresso'], icon: 'local-cafe' },
+        { keys: ['essence', 'fuel', 'gas', 'station-service'], icon: 'local-gas-station' },
+        { keys: ['parking', 'park', 'stationnement'], icon: 'local-parking' },
+        { keys: ['hôpital', 'hopital', 'hospital', 'clinique', 'clinic', 'pharmacie', 'pharmacy'], icon: 'local-hospital' },
+        { keys: ['bus', 'autobus'], icon: 'directions-bus' },
+        { keys: ['hotel', 'motel', 'auberge', 'hostel'], icon: 'local-hotel' },
+        { keys: ['supermarch', 'supermarket', 'grocery', 'epicerie', 'épicerie'], icon: 'local-grocery-store' },
+        { keys: ['bank', 'banque', 'atm'], icon: 'account-balance' },
+        { keys: ['pharmacie', 'pharmacy'], icon: 'local-hospital' },
+      ];
+
+      const text = title + ' ' + subtitle;
+      for (const entry of keywordsMap) {
+        for (const k of entry.keys) {
+          try {
+            const re = new RegExp('\\b' + k.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&') + '\\b', 'i');
+            if (re.test(text)) return entry.icon;
+          } catch (e) {
+            if (text.includes(k)) return entry.icon;
+          }
+        }
+      }
+
+      if (type === 'overpass') return 'local-activity';
+      if (type === 'nominatim') return 'place';
+      return 'place';
+    };
+
     if (item.amenityType?.startsWith("category_")) {
       const categoryType = item.amenityType.replace(
         "category_",
@@ -81,24 +175,23 @@ const SearchResultItem = memo(
         onPress={() => onSelectResult(item)}
       >
         <View style={styles.resultContent}>
-          <Icon
-            name={
-              item.type === "history"
-                ? "history"
-                : item.type === "nominatim"
-                ? "place"
-                : "local-activity"
-            }
-            size={20}
-            color={
-              item.type === "history"
-                ? "#FF9500"
-                : item.type === "nominatim"
-                ? "#666"
-                : "#9C27B0"
-            }
-            style={styles.resultIcon}
-          />
+          <View style={styles.iconColumn}>
+            <Icon
+              name={getIconForResult(item) as any}
+              size={20}
+              color={
+                item.type === "history"
+                  ? "#FF9500"
+                  : item.type === "nominatim"
+                  ? "#666"
+                  : "#9C27B0"
+              }
+              style={styles.resultIcon}
+            />
+            {item.distance != null && (
+              <Text style={styles.distanceText}>{formatDistance(item.distance)}</Text>
+            )}
+          </View>
           <View style={styles.resultText}>
             <View style={styles.titleRow}>
               <Text style={styles.resultTitle} numberOfLines={1}>
@@ -191,6 +284,7 @@ interface SearchResult {
   type: "nominatim" | "overpass" | "history";
   searchCount?: number;
   amenityType?: string;
+  distance?: number;
 }
 
 interface ExpandableSearchProps {
@@ -210,6 +304,10 @@ interface ExpandableSearchProps {
   onResumeLastTrip?: () => void;
   onCameraMove?: (coordinate: { latitude: number; longitude: number } | null, offset?: { x: number; y: number }) => void;
   onImportGpx?: () => void;
+  onShowTemporaryMarker?: (result: SearchResult | null) => void;
+  onDisableFollow?: () => void;
+  onRestoreFollow?: () => void;
+  onBlockLocationInfo?: (v: boolean) => void;
 }
 
 export default function ExpandableSearch({
@@ -229,7 +327,11 @@ export default function ExpandableSearch({
   onResumeLastTrip,
   onCameraMove,
   onImportGpx,
+  onShowTemporaryMarker,
+  onDisableFollow,
+  onRestoreFollow,
 }: ExpandableSearchProps) {
+  const onBlockLocationInfo = (typeof (arguments[0] as any)?.onBlockLocationInfo === 'function') ? (arguments[0] as any).onBlockLocationInfo as (v:boolean)=>void : undefined;
   const { width: windowWidth } = useWindowDimensions();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettingsOverlay, setShowSettingsOverlay] = useState(false);
@@ -238,8 +340,11 @@ export default function ExpandableSearch({
   const animatedRotationsRef = useRef<Record<string, Animated.Value>>({});
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
+  const [showResultDrawer, setShowResultDrawer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [searchMode, setSearchMode] = useState<"address" | "poi" | "recent">("address");
+  const [searchLayout, setSearchLayout] = useState<{ y: number; height: number }>({ y: 50, height: 56 });
   const [shouldSearch, setShouldSearch] = useState(false);
   const [historyItems, setHistoryItems] = useState<SearchResult[]>([]);
   const searchTimeout = useRef<NodeJS.Timeout>();
@@ -362,6 +467,32 @@ export default function ExpandableSearch({
     return patterns.some((pattern) => pattern.test(trimmed));
   };
 
+  const detectPlusCode = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    try {
+      return PlusCodeService.isValid(trimmed);
+    } catch {
+      return false;
+    }
+  };
+
+  const computeCameraOffsetForResult = () => {
+    try {
+      const screenHeight = Dimensions.get("window").height;
+      const DRAWER_HEIGHT = screenHeight * 0.5;
+      const drawerTop = screenHeight - DRAWER_HEIGHT;
+      const closedSearchBottom = (searchLayout.y || 50) + (searchLayout.height || 56);
+      const desiredScreenY = (drawerTop + closedSearchBottom) / 2;
+      let offsetY = Math.round(screenHeight / 2 - desiredScreenY);
+      const EXTRA_OFFSET_PX = -300;
+      offsetY = offsetY + EXTRA_OFFSET_PX;
+      return { x: 0, y: offsetY };
+    } catch (e) {
+      return { x: 0, y: 400 };
+    }
+  };
+
   const parseCoordinates = (
     text: string
   ): { latitude: number; longitude: number } | null => {
@@ -387,7 +518,6 @@ export default function ExpandableSearch({
 
     if (isExpanded && searchMode === "address" && value.trim().length > 0) {
       const isCoordinates = detectCoordinates(value);
-
       if (isCoordinates) {
         const coords = parseCoordinates(value);
         if (coords) {
@@ -395,17 +525,42 @@ export default function ExpandableSearch({
             {
               id: `coordinates_${coords.latitude}_${coords.longitude}`,
               title: "📍 Aller à ce point",
-              subtitle: `${coords.latitude.toFixed(
-                6
-              )}, ${coords.longitude.toFixed(6)}`,
+              subtitle: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
               latitude: coords.latitude,
               longitude: coords.longitude,
               type: "nominatim",
             },
           ]);
+        } else {
+          setSearchResults([]);
         }
         setIsLoading(false);
+        setShouldSearch(false);
         return;
+      }
+
+      if (detectPlusCode(value)) {
+        const decoded = PlusCodeService.tryDecode(value, userLocation || undefined);
+        if (decoded) {
+          setSearchResults([
+            {
+              id: `pluscode_${decoded.fullCode}`,
+              title: "Aller au point",
+              subtitle: decoded.fullCode,
+              latitude: decoded.latitude,
+              longitude: decoded.longitude,
+              type: "nominatim",
+            },
+          ]);
+          setIsLoading(false);
+          setShouldSearch(false);
+          return;
+        } else {
+          setSearchResults([]);
+          setIsLoading(false);
+          setShouldSearch(false);
+          return;
+        }
       }
     }
 
@@ -447,7 +602,7 @@ export default function ExpandableSearch({
   };
 
   const searchAddresses = async (query: string) => {
-    const results = await NominatimService.search(query, { limit: 8 });
+    const results = await NominatimService.search(query, { limit: 8, lat: userLocation?.latitude, lon: userLocation?.longitude });
 
     const formattedResults: SearchResult[] = results.map((result) => ({
       id: result.place_id.toString(),
@@ -456,6 +611,8 @@ export default function ExpandableSearch({
       latitude: parseFloat(result.lat),
       longitude: parseFloat(result.lon),
       type: "nominatim",
+      amenityType: result.type || undefined,
+      distance: userLocation ? calculateDistance(userLocation.latitude, userLocation.longitude, parseFloat(result.lat), parseFloat(result.lon)) : undefined,
     }));
 
     const combinedResults = [...historyItems, ...formattedResults];
@@ -470,16 +627,47 @@ export default function ExpandableSearch({
       );
     });
 
-    const sortedResults = uniqueResults.sort((a, b) => {
-      if (a.type === "history" && b.type !== "history") return -1;
-      if (a.type !== "history" && b.type === "history") return 1;
-      if (a.type === "history" && b.type === "history") {
-        return (b.searchCount || 0) - (a.searchCount || 0);
-      }
-      return 0;
-    });
+    let sortedResults = uniqueResults;
+
+    if (userLocation) {
+      sortedResults = uniqueResults.sort((a, b) => {
+        const da = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
+        const db = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
+        if (da === db) {
+          if (a.type === 'history' && b.type !== 'history') return -1;
+          if (a.type !== 'history' && b.type === 'history') return 1;
+          if (a.type === 'history' && b.type === 'history') return (b.searchCount || 0) - (a.searchCount || 0);
+          return 0;
+        }
+        return da - db;
+      });
+    } else {
+      sortedResults = uniqueResults.sort((a, b) => {
+        if (a.type === "history" && b.type !== "history") return -1;
+        if (a.type !== "history" && b.type === "history") return 1;
+        if (a.type === "history" && b.type === "history") {
+          return (b.searchCount || 0) - (a.searchCount || 0);
+        }
+        return 0;
+      });
+    }
 
     setSearchResults(sortedResults);
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return (R * c) / 1000;
   };
 
   const normalizeText = (text: string): string => {
@@ -618,12 +806,11 @@ export default function ExpandableSearch({
         });
       }
 
-      if (result.type === 'overpass' && onCameraMove && result.latitude && result.longitude) {
-  const offset = { x: 0, y: 400 };
+      if (onCameraMove && result.latitude != null && result.longitude != null) {
+        const offset = computeCameraOffsetForResult();
         try {
           setTimeout(() => onCameraMove && onCameraMove({ latitude: result.latitude, longitude: result.longitude }, offset), 80);
-        } catch (e) {
-        }
+        } catch (e) {}
       }
 
       onSelectLocation(result);
@@ -838,6 +1025,13 @@ export default function ExpandableSearch({
       });
     }
 
+    if (onCameraMove && result.latitude != null && result.longitude != null) {
+      const offset = computeCameraOffsetForResult();
+      try {
+        setTimeout(() => onCameraMove && onCameraMove({ latitude: result.latitude, longitude: result.longitude }, offset), 80);
+      } catch (e) {}
+    }
+
     onSelectLocation(result);
     setIsExpanded(false);
     setSearchResults([]);
@@ -845,25 +1039,43 @@ export default function ExpandableSearch({
 
   const keyExtractor = useCallback((item: SearchResult) => item.id, []);
 
+  const handleContainerPress = useCallback((result: SearchResult) => {
+    if (result.amenityType?.startsWith('category_')) return;
+    setSelectedResult(result);
+    try {
+      const offset = computeCameraOffsetForResult();
+      if (onCameraMove && result.latitude != null && result.longitude != null) {
+        onCameraMove({ latitude: result.latitude, longitude: result.longitude }, offset);
+      }
+    } catch (e) {
+      }
+
+    try { if (onDisableFollow) onDisableFollow(); } catch (e) {}
+    setShowResultDrawer(true);
+  if (onBlockLocationInfo) onBlockLocationInfo(true);
+    try { if (onShowTemporaryMarker) onShowTemporaryMarker(result); } catch (e) {}
+    setIsExpanded(false);
+  }, [onCameraMove, onShowTemporaryMarker]);
+
   const renderSearchResult = useCallback(
     ({ item }: { item: SearchResult }) => (
       <SearchResultItem
         item={item}
-        onSelectResult={handleSelectResult}
+        onSelectResult={handleContainerPress}
         onShowRoute={onShowRoute ? handleShowRouteCallback : undefined}
         onAddNavigationStop={
           onAddNavigationStop ? handleAddNavigationStopCallback : undefined
         }
         onAddStep={onAddStep ? handleAddStepCallback : undefined}
-  onToggleFavorite={handleToggleFavorite}
-  isFavorite={(id: string) => favoriteIds.includes(id)}
+        onToggleFavorite={handleToggleFavorite}
+        isFavorite={(id: string) => favoriteIds.includes(id)}
         isNavigating={isNavigating}
         getCategoryColor={getCategoryColor}
         onDeleteHistoryItem={handleDeleteHistoryItemCallback}
       />
     ),
     [
-      handleSelectResult,
+      handleContainerPress,
       handleShowRouteCallback,
       handleAddNavigationStopCallback,
       handleAddStepCallback,
@@ -873,6 +1085,7 @@ export default function ExpandableSearch({
       onShowRoute,
       onAddNavigationStop,
       onAddStep,
+      favoriteIds,
     ]
   );
 
@@ -933,10 +1146,18 @@ export default function ExpandableSearch({
   <>
       {}
       {!isNavigating && (
-        <View style={[
+        <View
+          style={[
             styles.searchContainer,
             windowWidth > 700 ? { left: windowWidth * 0.12, right: windowWidth * 0.12, top: 32 } : {},
-          ]}>
+          ]}
+          onLayout={(e) => {
+            try {
+              const { y, height } = e.nativeEvent.layout;
+              setSearchLayout({ y, height });
+            } catch (err) {}
+          }}
+        >
           {}
           <TouchableOpacity
             activeOpacity={0.8}
@@ -949,7 +1170,7 @@ export default function ExpandableSearch({
             }}
           >
             <Text style={styles.searchInputText} numberOfLines={1}>
-              {value && value.length > 0 ? value : placeholder}
+              {placeholder}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -1258,7 +1479,69 @@ export default function ExpandableSearch({
           </Animated.View>
           {}
         </SafeAreaView>
-      </Modal>
+        </Modal>
+      <SearchResultDrawer
+        visible={showResultDrawer}
+        result={selectedResult}
+        onBlockLocationInfo={onBlockLocationInfo}
+          onClose={() => {
+          try { if (onShowTemporaryMarker) onShowTemporaryMarker(null); } catch (e) {}
+          if (selectedResult) {
+            if (onCameraMove && selectedResult.latitude != null && selectedResult.longitude != null) {
+              const offset = { x: 0, y: 400 };
+              try {
+                onCameraMove({ latitude: selectedResult.latitude, longitude: selectedResult.longitude }, offset);
+              } catch (e) {}
+            }
+            onSelectLocation(selectedResult);
+          }
+          setShowResultDrawer(false);
+          if (onBlockLocationInfo) onBlockLocationInfo(false);
+          setSelectedResult(null);
+          setIsExpanded(false);
+          setSearchResults([]);
+        }}
+        onClearTemporaryMarker={() => { try { if (onShowTemporaryMarker) onShowTemporaryMarker(null); } catch (e) {} }}
+        onBackToSearch={() => {
+          setShowResultDrawer(false);
+          if (onBlockLocationInfo) onBlockLocationInfo(false);
+          setIsExpanded(true);
+        }}
+        onNavigate={() => {
+          if (selectedResult) {
+            if (onShowRoute) onShowRoute(selectedResult);
+            setShowResultDrawer(false);
+            setSelectedResult(null);
+            setIsExpanded(false);
+            setSearchResults([]);
+          }
+        }}
+        onConfirmOpenRoute={(res) => {
+          try {
+            if (onShowRoute) {
+              onShowRoute(res);
+            } else {
+              onSelectLocation(res);
+            }
+          } catch (e) {}
+          setShowResultDrawer(false);
+          setSelectedResult(null);
+          setIsExpanded(false);
+          setSearchResults([]);
+        }}
+        onOpenTransit={(res) => {
+          try { if (onShowTemporaryMarker) onShowTemporaryMarker(res); } catch (e) {}
+          if (res) {
+            if (onCameraMove && res.latitude != null && res.longitude != null) {
+              const offset = { x: 0, y: 400 };
+              try { onCameraMove({ latitude: res.latitude, longitude: res.longitude }, offset); } catch (e) {}
+            }
+          }
+          setShowResultDrawer(false);
+          setIsExpanded(false);
+          setSearchResults([]);
+        }}
+      />
     </>
   );
 }
@@ -1271,7 +1554,7 @@ const styles = StyleSheet.create({
     top: 50,
     left: 20,
     right: 20,
-    zIndex: 10,
+    zIndex: 100,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1410,6 +1693,16 @@ const styles = StyleSheet.create({
   },
   resultIcon: {
     marginRight: 12,
+  },
+  iconColumn: {
+    alignItems: 'center',
+    width: 48,
+    marginRight: 8,
+  },
+  distanceText: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 4,
   },
   resultText: {
     flex: 1,

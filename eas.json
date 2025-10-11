@@ -8,7 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EAS_BUILD_PROFILE": "development"
+        "EAS_BUILD_PROFILE": "development",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "android": {
         "buildType": "apk"
@@ -17,7 +18,8 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EAS_BUILD_PROFILE": "preview"
+        "EAS_BUILD_PROFILE": "preview",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "android": {
         "buildType": "apk"
@@ -26,7 +28,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EAS_BUILD_PROFILE": "production"
+        "EAS_BUILD_PROFILE": "production",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "android": {
         "buildType": "apk"

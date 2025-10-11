@@ -32,6 +32,7 @@ class NavigationService {
   private distanceBufferSize: number = 5;
   private lastLocationTimestamp: number = 0;
   private lastLocation: { latitude: number; longitude: number } | null = null;
+  private lastLocationAccuracy: number | null = null;
   private routeCoordinates: number[] = [];
   private lastTripDestination: {
     latitude: number;
@@ -50,6 +51,8 @@ class NavigationService {
   private recalcDistanceThreshold: number = 50;
   private routeServiceDisabledUntil: number = 0;
   private pendingRecalculation: boolean = false;
+  private lastRecalcBlockedUntil: number = 0;
+  private lastRecalcAppliedAt: number = 0;
 
   private async finalizeRecalculation(newSteps?: NavigationStep[], newFlatCoords?: number[]) {
     try {
@@ -73,6 +76,12 @@ class NavigationService {
       this.navigationState.isRecalculating = false;
       this.pendingRecalculation = false;
       this.offRouteCounter = 0;
+      try {
+        this.lastRecalcAppliedAt = Date.now();
+        if (this.lastLocation) {
+          this.navigationState.currentLocation = this.lastLocation;
+        }
+      } catch (e) {}
       this.notifyListeners();
     } catch (e) {
       try { this.pendingRecalculation = false; this.offRouteCounter = 0; this.navigationState.isRecalculating = false; } catch (_) {}
@@ -80,30 +89,57 @@ class NavigationService {
   }
 
 async startNavigation(
-    routeSteps: NavigationStep[],
-    routeService?: any,
-    mode: string = "driving",
-    fullRouteCoordinates?: number[],
-    destinationInfo?: { latitude: number; longitude: number; name?: string }
-  ) {
+  routeSteps: NavigationStep[],
+  routeService?: any,
+  mode: string = "driving",
+  fullRouteCoordinates?: number[],
+  destinationInfo?: { latitude: number; longitude: number; name?: string }
+) {
+    
     Vibration.vibrate(150);
 
     this.routeService = routeService;
     this.currentMode = mode;
-    this.routeCoordinates = fullRouteCoordinates || [];
+    let steps: NavigationStep[] = Array.isArray(routeSteps) ? routeSteps.slice() : [];
+    this.routeCoordinates = Array.isArray(fullRouteCoordinates) ? fullRouteCoordinates.slice() : [];
+
+    
+    try {
+      if ((!steps || steps.length === 0) && routeService) {
+        const raw = (routeService as any).lastRawRouteData || (routeService as any).routeData || null;
+        if (raw) {
+          try {
+            const derived = this.convertRouteToNavigationSteps(raw);
+            if (Array.isArray(derived) && derived.length > 0) {
+              steps = derived;
+              }
+          } catch (e) {
+            
+          }
+        }
+      }
+
+      if ((!this.routeCoordinates || this.routeCoordinates.length < 4) && routeService && Array.isArray((routeService as any).routeCoords) && (routeService as any).routeCoords.length > 0) {
+        try {
+          this.routeCoordinates = ((routeService as any).routeCoords as any[]).map((c: any) => [c.longitude, c.latitude]).flat();
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
     this.lastTripDestination = destinationInfo || null;
 
-    if (routeSteps.length > 0 && destinationInfo) {
+    if (steps.length > 0 && destinationInfo) {
       await LastTripStorage.save({
         destination: destinationInfo,
         mode,
-        routeSteps,
-        fullRouteCoordinates: fullRouteCoordinates || [],
+        routeSteps: steps,
+        fullRouteCoordinates: this.routeCoordinates || [],
       });
     }
 
-    let currentLocation: { latitude: number; longitude: number } | null = null;
-    let initialStepIndex = 0;
+  let currentLocation: { latitude: number; longitude: number } | null = null;
+  let initialStepIndex = 0;
 
     try {
       const locationResult = await Location.getCurrentPositionAsync({
@@ -115,20 +151,20 @@ async startNavigation(
       };
       this.initialLocation = currentLocation;
 
-      if (routeSteps.length > 0) {
+      if (steps.length > 0) {
         const closestStepIndex = NavigationInstructionService.findClosestStep(
           currentLocation,
-          routeSteps
+          steps
         );
 
         if (closestStepIndex > 0) {
           const distanceToFirst = this.calculateDistanceToStep(
             currentLocation,
-            routeSteps[0]
+            steps[0]
           );
           const distanceToClosest = this.calculateDistanceToStep(
             currentLocation,
-            routeSteps[closestStepIndex]
+            steps[closestStepIndex]
           );
 
           if (
@@ -145,16 +181,16 @@ async startNavigation(
     this.navigationState = {
       ...this.navigationState,
       isNavigating: true,
-      currentStepIndex: initialStepIndex,
-      steps: routeSteps,
-      remainingDistance: this.calculateTotalDistance(routeSteps),
-      remainingDuration: this.calculateTotalDuration(routeSteps),
-      nextStep: routeSteps[initialStepIndex],
-      distanceToNextStep: routeSteps[initialStepIndex]?.distance || 0,
+  currentStepIndex: initialStepIndex,
+  steps: steps,
+  remainingDistance: this.calculateTotalDistance(steps.slice(initialStepIndex)),
+  remainingDuration: this.calculateTotalDuration(steps.slice(initialStepIndex)),
+  nextStep: steps[initialStepIndex],
+  distanceToNextStep: steps[initialStepIndex]?.distance || 0,
       currentLocation: currentLocation,
       completedRouteCoordinates: [],
       remainingRouteCoordinates: this.convertRouteCoordinatesToPairs(
-        fullRouteCoordinates || []
+        this.routeCoordinates || []
       ),
       progressPercentage: 0,
       hasStartedMoving: initialStepIndex > 0,
@@ -164,6 +200,7 @@ async startNavigation(
 
     this.startLocationTracking();
   this.startOffRouteTimer();
+    this.updateRemainingStats();
     this.notifyListeners();
   }
 
@@ -208,7 +245,7 @@ async startNavigation(
           this.updateCurrentLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-          });
+          }, location.coords.accuracy);
         }
       );
     } catch (error) {
@@ -248,9 +285,12 @@ async startNavigation(
     }
   }
 
-  private async performOffRouteCheck(location: { latitude: number; longitude: number }): Promise<boolean> {
+  private async performOffRouteCheck(location: { latitude: number; longitude: number }, accuracy?: number): Promise<boolean> {
     const now = Date.now();
     if (!this.navigationState || !this.navigationState.isNavigating) return false;
+    if (now < this.lastRecalcBlockedUntil) {
+      return false;
+    }
     if (now - this.lastRouteCheck < this.offRouteCheckInterval) return false;
     this.lastRouteCheck = now;
 
@@ -290,19 +330,20 @@ async startNavigation(
         speed = d / dt;
       }
     }
-
-    const effectiveThreshold = speed < 1 ? this.offRouteTolerance * 1.2 : this.offRouteTolerance;
+    
+    const navPrecision = (typeof this.lastLocationAccuracy === 'number' && this.lastLocationAccuracy > 0) ? this.lastLocationAccuracy : this.offRouteTolerance;
+    const effectiveThreshold = (speed < 1 ? navPrecision * 1.2 : navPrecision) + 10;
     let detectHelper = false;
     try {
       if (routeServiceAvailable && typeof this.routeService.detectOffRoute === 'function') {
-        detectHelper = !!this.routeService.detectOffRoute({ latitude: location.latitude, longitude: location.longitude }, this.offRouteTolerance);
+        detectHelper = !!this.routeService.detectOffRoute({ latitude: location.latitude, longitude: location.longitude }, effectiveThreshold);
       }
     } catch (e) {
       detectHelper = false;
     }
 
-    const isCurrentlyOffRoute = median > effectiveThreshold;
-    const forceByDistance = Number.isFinite(distanceToRoute) && distanceToRoute > this.recalcDistanceThreshold;
+  const isCurrentlyOffRoute = median > effectiveThreshold;
+  const forceByDistance = Number.isFinite(distanceToRoute) && distanceToRoute > this.recalcDistanceThreshold;
     const finalOffRouteDecision = isCurrentlyOffRoute || detectHelper || forceByDistance;
 
     try {
@@ -333,17 +374,20 @@ async startNavigation(
       }
     }
 
-    this.navigationState.isOffRoute = true;
-    this.pendingRecalculation = true;
-    this.navigationState.isRecalculating = true;
-    this.notifyListeners();
+    if (recalculationStart) {
+      if (this.pendingRecalculation) return true;
+      this.pendingRecalculation = true;
+      this.navigationState.isOffRoute = true;
+      this.navigationState.isRecalculating = true;
+      this.notifyListeners();
+      this.lastRecalcBlockedUntil = Date.now() + 10000;
+    }
 
     if (recalculationStart && this.lastTripDestination) {
       if (!this.pendingRecalculation) {
         this.pendingRecalculation = true;
         this.navigationState.isRecalculating = true;
       }
-
       (async () => {
         try {
           Vibration.vibrate([50, 50, 50]);
@@ -368,6 +412,7 @@ async startNavigation(
           this.notifyListeners();
         } finally {
           this.pendingRecalculation = false;
+          this.lastRecalcBlockedUntil = Date.now() + 10000;
         }
       })();
 
@@ -396,7 +441,6 @@ async startNavigation(
             const flatFromService = (this.routeService && (this.routeService.routeCoords?.map((c: any) => [c.longitude, c.latitude]).flat())) || undefined;
             this.routeCoordinates = flatFromService || this.routeCoordinates;
           }
-
           await LastTripStorage.save({ destination: this.lastTripDestination, mode: this.currentMode, routeSteps: newSteps, fullRouteCoordinates: this.routeCoordinates });
           await this.finalizeRecalculation(newSteps, this.routeCoordinates);
         } else {
@@ -406,6 +450,7 @@ async startNavigation(
     }
 
     this.pendingRecalculation = false;
+    this.lastRecalcBlockedUntil = Date.now() + 10000;
     return true;
   }
 
@@ -419,8 +464,11 @@ async startNavigation(
   private async updateCurrentLocation(location: {
     latitude: number;
     longitude: number;
-  }) {
-    this.navigationState.currentLocation = location;
+  }, accuracy?: number) {
+    const rawLocation = { latitude: location.latitude, longitude: location.longitude };
+    let displayedLocation = rawLocation;
+    try { if (typeof accuracy === 'number') this.lastLocationAccuracy = accuracy; } catch (e) {}
+    this.lastLocationTimestamp = Date.now();
 
     try {
       try {
@@ -430,9 +478,9 @@ async startNavigation(
         }
       } catch (e) {
       }
-      let distLog: number | null = null;
-      let routeAvailable = false;
-      let routePointCount = 0;
+  let distLog: number | null = null;
+  let routeAvailable = false;
+  let routePointCount = 0;
 
       if (this.isRouteServiceAvailable() && this.routeService) {
         if (typeof this.routeService.getDistanceToRoute === 'function') {
@@ -469,6 +517,8 @@ async startNavigation(
         }
       }
 
+      
+
     } catch (e) {
     }
 
@@ -486,7 +536,7 @@ async startNavigation(
         }
       }
 
-      this.updateRouteProgress(location);
+  this.updateRouteProgress(rawLocation);
 
       if (this.navigationState.hasStartedMoving) {
         const closestStepIndex = NavigationInstructionService.findClosestStep(
@@ -562,14 +612,79 @@ async startNavigation(
       }
 
       try {
-        const offRouteHandled = await this.performOffRouteCheck(location);
+        let speed = 0;
+        const now = Date.now();
+        if (this.lastLocation && this.lastLocationTimestamp) {
+          const dt = (now - this.lastLocationTimestamp) / 1000;
+          if (dt > 0) {
+            const d = this.calculateDistance(this.lastLocation.latitude, this.lastLocation.longitude, rawLocation.latitude, rawLocation.longitude);
+            speed = d / dt;
+          }
+        }
+
+        const navPrecision = (typeof this.lastLocationAccuracy === 'number' && this.lastLocationAccuracy > 0) ? this.lastLocationAccuracy : this.offRouteTolerance;
+        const effectiveSnapThreshold = (speed < 1 ? navPrecision * 1.2 : navPrecision) + 10;
+
+          let distanceToRoutePrecise = Infinity;
+          try {
+            if (this.isRouteServiceAvailable() && this.routeService && typeof this.routeService.getDistanceToRoute === 'function') {
+              const d = this.routeService.getDistanceToRoute({ latitude: rawLocation.latitude, longitude: rawLocation.longitude });
+              if (Number.isFinite(d)) distanceToRoutePrecise = d;
+            }
+          } catch (e) {}
+
+          if (!Number.isFinite(distanceToRoutePrecise) && this.routeCoordinates && this.routeCoordinates.length >= 4) {
+            try { distanceToRoutePrecise = this.computeDistanceToRouteFromFlatCoords(rawLocation, this.routeCoordinates); } catch (e) { distanceToRoutePrecise = Infinity; }
+          }
+
+          if (Number.isFinite(distanceToRoutePrecise) && distanceToRoutePrecise <= effectiveSnapThreshold) {
+          let proj: { latitude: number; longitude: number } | null = null;
+          try {
+            if (this.isRouteServiceAvailable() && this.routeService) {
+              try {
+                const nrp = (this.routeService as any).nearestRoadPoint;
+                if (nrp && typeof nrp.latitude === 'number' && typeof nrp.longitude === 'number') {
+                  proj = nrp;
+                }
+              } catch (e) {  }
+
+              if (!proj && typeof (this.routeService as any).getClosestPoint === 'function') {
+                try {
+                  const p = (this.routeService as any).getClosestPoint({ latitude: rawLocation.latitude, longitude: rawLocation.longitude });
+                  if (p && typeof p.latitude === 'number' && typeof p.longitude === 'number') proj = p;
+                } catch (e) { proj = null; }
+              }
+            }
+          } catch (e) { proj = null; }
+
+          if (!proj && this.routeCoordinates && this.routeCoordinates.length >= 4) {
+            try { proj = this.computeClosestPointOnFlatCoords(rawLocation, this.routeCoordinates); } catch (e) { proj = null; }
+          }
+
+          if (proj) {
+            const now = Date.now();
+            const GRACE_MS_AFTER_RECALC = 8000;
+            const timeSinceRecalc = now - (this.lastRecalcAppliedAt || 0);
+
+            const snapMaxDistance = Math.max(15, (typeof this.lastLocationAccuracy === 'number' && this.lastLocationAccuracy > 0) ? this.lastLocationAccuracy * 2 : 30);
+            const distToProj = this.calculateDistance(rawLocation.latitude, rawLocation.longitude, proj.latitude, proj.longitude);
+
+            if (timeSinceRecalc > GRACE_MS_AFTER_RECALC && distToProj <= snapMaxDistance) {
+              displayedLocation = proj;
+            }
+          }
+        }
+
+        this.navigationState.currentLocation = displayedLocation;
+
+        const offRouteHandled = await this.performOffRouteCheck(displayedLocation);
         if (offRouteHandled) return;
       } catch (e) {
       }
 
       try {
         const onRouteNow = this.routeService && typeof this.routeService.isOnRoute === 'function'
-          ? this.routeService.isOnRoute({ latitude: location.latitude, longitude: location.longitude }, this.offRouteTolerance)
+          ? this.routeService.isOnRoute({ latitude: displayedLocation.latitude, longitude: displayedLocation.longitude }, this.offRouteTolerance)
           : true;
 
         if (onRouteNow && this.navigationState.isOffRoute && !this.pendingRecalculation) {
@@ -582,8 +697,8 @@ async startNavigation(
       }
 
       const distanceToNext = this.calculateDistance(
-        location.latitude,
-        location.longitude,
+        rawLocation.latitude,
+        rawLocation.longitude,
         this.navigationState.nextStep.coordinates[1],
         this.navigationState.nextStep.coordinates[0]
       );
@@ -629,12 +744,22 @@ async startNavigation(
     const remainingStepsAfterCurrent = this.navigationState.steps.slice(
       this.navigationState.currentStepIndex + 1
     );
+    
     this.navigationState.remainingDistance =
       this.calculateTotalDistance(remainingStepsAfterCurrent) +
       (this.navigationState.distanceToNextStep || 0);
+    
+    const currentStep = this.navigationState.steps[this.navigationState.currentStepIndex];
+    let estimatedTimeToNextStep = 0;
+    
+    if (currentStep && currentStep.duration > 0 && currentStep.distance > 0) {
+      const progressRatio = (this.navigationState.distanceToNextStep || 0) / currentStep.distance;
+      estimatedTimeToNextStep = currentStep.duration * progressRatio;
+    }
+    
     this.navigationState.remainingDuration =
       this.calculateTotalDuration(remainingStepsAfterCurrent) +
-      0;
+      estimatedTimeToNextStep;
   }
 
   private calculateTotalDistance(steps: NavigationStep[]): number {
@@ -703,7 +828,7 @@ async startNavigation(
       routeData.routes[0].legs.forEach((leg: any) => {
         if (leg.steps) {
           leg.steps.forEach((step: any, index: number) => {
-            const navigationStep = {
+            const navigationStep: any = {
               instruction:
                 step.maneuver?.instruction ||
                 `Continuer sur ${step.name || "la route"}`,
@@ -718,6 +843,33 @@ async startNavigation(
               bearingBefore: step.maneuver?.bearing_before,
               bearingAfter: step.maneuver?.bearing_after,
             };
+
+            const nextRaw = leg.steps[index + 1];
+            let nextNavStep: any = undefined;
+            if (nextRaw) {
+              nextNavStep = {
+                instruction: nextRaw.maneuver?.instruction || `Continuer sur ${nextRaw.name || "la route"}`,
+                distance: nextRaw.distance || 0,
+                duration: nextRaw.duration || 0,
+                maneuver: nextRaw.maneuver?.type || "straight",
+                coordinates: nextRaw.maneuver?.location || [0, 0],
+                streetName: nextRaw.name || "",
+                osrmModifier: nextRaw.maneuver?.modifier,
+              };
+            }
+
+            try {
+              const generated = require('./NavigationInstructionService').NavigationInstructionService.generateInstructionFromStep(
+                navigationStep,
+                nextNavStep,
+                index === 0,
+                true,
+                index
+              );
+              navigationStep.text = generated?.text || navigationStep.instruction;
+            } catch (e) {
+              navigationStep.text = navigationStep.instruction;
+            }
 
             steps.push(navigationStep);
           });

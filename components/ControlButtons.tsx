@@ -19,6 +19,7 @@ export default function ControlButtons({
   isNavigating = false
   , onOpenFavorites
 }: ControlButtonsProps) {
+  if (isNavigating) return null;
   const handleRecenterPress = () => {
     Vibration.vibrate(50);
     onRecenter();
@@ -64,6 +65,7 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: 'column',
     gap: 10,
+    zIndex: 100,
   },
   buttonContainerNavigating: {
     bottom: 120,

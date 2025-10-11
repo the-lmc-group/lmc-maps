@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { RouteCacheService } from './RouteCacheService';
 
 
 export interface Coordinate {
@@ -54,12 +55,14 @@ export interface RouteService {
   getNavigationData: () => NavigationData | null;
   isOffRoute: boolean;
   updateRouteData: (newRouteData: any) => void;
+  isFromCache: boolean;
 }
 
 export type TransportMode = 'driving' | 'walking' | 'bicycling';
 
 const DEFAULT_OSRM_HOSTS = [
-  'https://routing.openstreetmap.de/routed-car', 
+  'https://router.project-osrm.org',
+  'https://routing.openstreetmap.de/routed-car',
   'https://valhalla1.openstreetmap.de/route',
 ];
 
@@ -83,6 +86,7 @@ export function useRouteService(): RouteService {
   const [lastRequestTimings, setLastRequestTimings] = useState<{ host: string; durationMs: number; success: boolean; endpoint?: string }[]>([]);
   const [lastRawRouteData, setLastRawRouteData] = useState<any | null>(null);
   const [lastAlternatives, setLastAlternatives] = useState<Array<{ coords: Coordinate[]; duration: number; distance: number }>>([]);
+  const [isFromCache, setIsFromCache] = useState(false);
 
   const [routingErrorMessage, setRoutingErrorMessage] = useState<string | null>(null);
   const [routingErrorTimeout, setRoutingErrorTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -500,7 +504,7 @@ export function useRouteService(): RouteService {
     end: Coordinate, 
     mode = 'driving',
     options: { alternatives?: number; avoidTolls?: boolean; avoidHighways?: boolean } = {}
-  ): Promise<{ success: boolean; routes?: Array<{ coords: Coordinate[]; duration: number; distance: number }>; host?: string; timings: { host: string; durationMs: number; success: boolean; endpoint?: string }[] }> => {
+  ): Promise<{ success: boolean; routes?: Array<{ coords: Coordinate[]; duration: number; distance: number }>; host?: string; rawData?: any; timings: { host: string; durationMs: number; success: boolean; endpoint?: string }[] }> => {
     const osrmMode = mode === 'bicycling' ? 'bike' : mode;
     const altCount = Math.max(1, Math.min(3, options.alternatives || 1));
     const hosts = getRoutingHosts();
@@ -515,7 +519,7 @@ export function useRouteService(): RouteService {
       }
     }
 
-    const tryHostAlternatives = async (host: string): Promise<{ success: boolean; routes?: Array<{ coords: Coordinate[]; duration: number; distance: number }>; host: string; timing: { host: string; durationMs: number; success: boolean; endpoint?: string } }> => {
+    const tryHostAlternatives = async (host: string): Promise<{ success: boolean; routes?: Array<{ coords: Coordinate[]; duration: number; distance: number }>; host: string; rawData?: any; timing: { host: string; durationMs: number; success: boolean; endpoint?: string } }> => {
       const startTs = Date.now();
       try {
         if (isValhalla(host)) {
@@ -535,7 +539,7 @@ export function useRouteService(): RouteService {
               duration: Math.round(route.duration / 60),
               distance: Math.round(route.distance),
             }));
-            return { success: true, routes, host, timing };
+            return { success: true, routes, host, rawData: osrmData, timing };
           }
           return { success: false, host, timing };
         } else if (isOpenRouteService(host)) {
@@ -559,7 +563,7 @@ export function useRouteService(): RouteService {
               const distance = Math.round(route.properties?.summary?.distance ?? 0);
               return { coords, duration, distance };
             });
-            return { success: true, routes, host, timing };
+            return { success: true, routes, host, rawData: data, timing };
           }
           return { success: false, host, timing };
         } else {
@@ -581,7 +585,7 @@ export function useRouteService(): RouteService {
               duration: Math.round(route.duration / 60),
               distance: Math.round(route.distance),
             }));
-            return { success: true, routes, host, timing };
+            return { success: true, routes, host, rawData: data, timing };
           }
           return { success: false, host, timing };
         }
@@ -609,6 +613,7 @@ export function useRouteService(): RouteService {
               success: true, 
               routes: result.value.routes, 
               host: result.value.host, 
+              rawData: result.value.rawData,
               timings 
             };
           }
@@ -626,11 +631,54 @@ export function useRouteService(): RouteService {
     setLastRequestTimings([]);
     
     try {
+      const cacheKey = RouteCacheService.generateCacheKey(
+        start.latitude,
+        start.longitude,
+        end.latitude,
+        end.longitude,
+        mode
+      );
+      
+      const cachedRoute = await RouteCacheService.getCachedRoute(cacheKey);
+      
+      if (cachedRoute) {
+        setIsFromCache(true);
+        setIsOsrmAvailable(true);
+        setLastRawRouteData(cachedRoute.routeData);
+        
+        if (isOpenRouteService(routingHost)) {
+          const route = cachedRoute.routeData.features[0];
+          const coords = (route.geometry.coordinates as [number, number][]).map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
+          setRouteCoords(coords);
+          setDestination(end);
+          setRouteInfo({ 
+            duration: Math.round((route.properties?.summary?.duration ?? 0) / 60), 
+            distance: Math.round(route.properties?.summary?.distance ?? 0), 
+            instruction: 'Suivre l\'itinéraire' 
+          });
+        } else {
+          const route = cachedRoute.routeData.routes[0];
+          const coords = (route.geometry.coordinates as [number, number][]).map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
+          setRouteCoords(coords);
+          setDestination(end);
+          setRouteInfo({ 
+            duration: Math.round(route.duration / 60), 
+            distance: Math.round(route.distance), 
+            instruction: 'Suivre l\'itinéraire' 
+          });
+        }
+        
+        setIsCalculating(false);
+        return true;
+      }
+      
       const result = await fetchParallelRoutes(start, end, mode);
       setLastRequestTimings(result.timings);
+      setIsFromCache(false);
       
       if (!result.success || !result.data || !result.host) {
         setIsOsrmAvailable(false);
+        setIsCalculating(false);
         return false;
       }
 
@@ -638,15 +686,19 @@ export function useRouteService(): RouteService {
       setLastOsrmCheck(Date.now());
       setRoutingHost(result.host);
       setLastRawRouteData(result.data);
+      
+      await RouteCacheService.setCachedRoute(cacheKey, result.data);
 
       if (isOpenRouteService(result.host)) {
         const route = result.data.features[0];
         const coords = (route.geometry.coordinates as [number, number][]).map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
         setRouteCoords(coords);
         setDestination(end);
+        const duration = Math.round((route.properties?.summary?.duration ?? 0) / 60);
+        const distance = Math.round(route.properties?.summary?.distance ?? 0);
         setRouteInfo({ 
-          duration: Math.round((route.properties?.summary?.duration ?? 0) / 60), 
-          distance: Math.round(route.properties?.summary?.distance ?? 0), 
+          duration, 
+          distance, 
           instruction: 'Suivre l\'itinéraire' 
         });
       } else {
@@ -654,9 +706,11 @@ export function useRouteService(): RouteService {
         const coords = (route.geometry.coordinates as [number, number][]).map(([lon, lat]) => ({ latitude: lat, longitude: lon }));
         setRouteCoords(coords);
         setDestination(end);
+        const duration = Math.round(route.duration / 60);
+        const distance = Math.round(route.distance);
         setRouteInfo({ 
-          duration: Math.round(route.duration / 60), 
-          distance: Math.round(route.distance), 
+          duration, 
+          distance, 
           instruction: 'Suivre l\'itinéraire' 
         });
       }
@@ -746,6 +800,36 @@ export function useRouteService(): RouteService {
     setLastRequestTimings([]);
     
     try {
+      const cacheKey = RouteCacheService.generateCacheKey(
+        start.latitude,
+        start.longitude,
+        end.latitude,
+        end.longitude,
+        mode,
+        options
+      );
+      
+      const cachedRoute = await RouteCacheService.getCachedRoute(cacheKey);
+      
+      if (cachedRoute && cachedRoute.alternatives) {
+        setIsOsrmAvailable(true);
+        setLastRawRouteData(cachedRoute.routeData);
+        
+        if (cachedRoute.alternatives.length > 0) {
+          setRouteCoords(cachedRoute.alternatives[0].coords);
+          setDestination(end);
+          setRouteInfo({ 
+            duration: cachedRoute.alternatives[0].duration, 
+            distance: cachedRoute.alternatives[0].distance, 
+            instruction: "Suivre l'itinéraire" 
+          });
+          setLastAlternatives(cachedRoute.alternatives);
+        }
+        
+        setIsCalculating(false);
+        return cachedRoute.alternatives;
+      }
+      
       const result = await fetchParallelAlternatives(start, end, mode, options);
       setLastRequestTimings(result.timings);
       
@@ -760,6 +844,8 @@ export function useRouteService(): RouteService {
       setRoutingHost(result.host);
       
       if (result.routes.length > 0) {
+        await RouteCacheService.setCachedRoute(cacheKey, result.rawData, result.routes);
+        
         setRouteCoords(result.routes[0].coords);
         setDestination(end);
         setRouteInfo({ 
@@ -807,6 +893,7 @@ export function useRouteService(): RouteService {
       const distanceToRoad = calculateDistance(correctedStart, nearestStart);
 
       let finalRouteCoords: Coordinate[] = [];
+      let finalRouteData: any = null;
       let hasDirectLine = false;
 
       if (distanceToRoad > 100) {
@@ -836,7 +923,8 @@ export function useRouteService(): RouteService {
                 continue;
               }
               if (data?.features?.length) { 
-                finalRouteCoords = data.features[0].geometry.coordinates.map(([lon, lat]: [number, number]) => ({ latitude: lat, longitude: lon })); 
+                finalRouteCoords = data.features[0].geometry.coordinates.map(([lon, lat]: [number, number]) => ({ latitude: lat, longitude: lon }));
+                finalRouteData = data;
                 break; 
               }
             } else {
@@ -851,7 +939,8 @@ export function useRouteService(): RouteService {
                 continue;
               }
               if (data?.routes?.length) { 
-                finalRouteCoords = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => ({ latitude: lat, longitude: lon })); 
+                finalRouteCoords = data.routes[0].geometry.coordinates.map(([lon, lat]: [number, number]) => ({ latitude: lat, longitude: lon }));
+                finalRouteData = data;
                 break; 
               }
             }
@@ -921,10 +1010,12 @@ export function useRouteService(): RouteService {
       }
 
       if (finalRouteCoords && finalRouteCoords.length) {
-        setLastRawRouteData(null);
+        setLastRawRouteData(finalRouteData);
         setRouteCoords(finalRouteCoords);
         setDestination(end);
-        setHasDirectLineSegment(hasDirectLine);
+        setDirectLineCoords([]);
+        setNearestRoadPoint(null);
+        setHasDirectLineSegment(false);
         return true;
       }
 
@@ -1106,6 +1197,7 @@ export function useRouteService(): RouteService {
   getNavigationData,
   isOffRoute,
   updateRouteData,
+  isFromCache,
   };
 }
 

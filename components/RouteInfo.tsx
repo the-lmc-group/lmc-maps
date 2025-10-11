@@ -393,7 +393,7 @@ export default function RouteDrawer({
         destination &&
         !isCalculatingRoute
       ) {
-        (onTransportModeChange as any)("driving", destination, { alternatives, avoidTolls, avoidHighways });
+  (onTransportModeChange as any)(selectedTransport, destination, { alternatives, avoidTolls, avoidHighways });
       }
     } else {
       try {

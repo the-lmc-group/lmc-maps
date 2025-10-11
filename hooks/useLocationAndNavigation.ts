@@ -63,14 +63,9 @@ export function useLocationAndNavigation() {
     }
   }, [routeService.routeCoords]);
 
-  const handleLongPress = async (coordinate: Coordinate) => {
+  const handleLongPress = async (coordinate: Coordinate, mode: string = 'driving') => {
     if (locationService.location) {
-      const start: Coordinate = {
-        latitude: locationService.location.latitude,
-        longitude: locationService.location.longitude
-      };
-      
-      await routeService.getHybridRoute(start, coordinate, 'driving');
+      await getHybridRouteFromCurrentLocation(coordinate, mode);
     }
   };
 
@@ -87,7 +82,14 @@ export function useLocationAndNavigation() {
       longitude: locationService.location.longitude
     };
 
-    return await routeService.getHybridRoute(start, destination, mode);
+    const normalizedMode = (mode || 'driving').toString().toLowerCase();
+    const isWalking = normalizedMode === 'walking' || normalizedMode === 'foot' || normalizedMode === 'foot-walking';
+
+    if (isWalking) {
+      return await routeService.getRoute(start, destination, 'walking');
+    }
+
+    return await routeService.getHybridRoute(start, destination, normalizedMode);
   };
 
   const getRouteFromCurrentLocation = async (

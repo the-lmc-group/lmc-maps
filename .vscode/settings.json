@@ -1,4 +1,10 @@
 {
+  "json.schemaDownload.enable": false,
+  "json.validate.enable": true,
+  "files.associations": {
+    "eas.json": "jsonc",
+    "**/patches_source/**": "plaintext"
+  },
   "java.enabled": false,
   "java.import.gradle.enabled": false,
   "java.gradle.buildServer.enabled": "off",
@@ -13,5 +19,10 @@
     "**/.settings": true,
     "**/.project": true,
     "**/.classpath": true
+  }
+  ,
+  "files.watcherExclude": {
+    "**/patches_source/**": true,
+    "**/node_modules/**": true
   }
 }

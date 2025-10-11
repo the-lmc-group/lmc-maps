@@ -19,6 +19,7 @@ export interface ViewportPadding {
 
 export interface MapViewContextType {
   mapRef: React.RefObject<MapView>;
+  cameraRef: React.RefObject<any>;
   centerCoordinate: [number, number] | null;
   zoomLevel: number;
   pitch: number;
@@ -56,6 +57,7 @@ export function MapViewProvider({
   initialHeading = 0
 }: MapViewProviderProps) {
   const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<any>(null);
   
   const [centerCoordinate, setCenterCoordinate] = useState<[number, number] | null>(initialCenter);
   const [zoomLevel, setZoomLevel] = useState<number>(initialZoom);
@@ -71,6 +73,7 @@ export function MapViewProvider({
   const pendingCameraConfigs = React.useRef<
     Array<{ config: CameraConfig; forced?: boolean; controllerId?: string }>
   >([]);
+  const mapReadyRef = React.useRef<boolean>(false);
 
   React.useEffect(() => {
     return () => {
@@ -114,14 +117,29 @@ export function MapViewProvider({
       hasChanged = true;
     }
 
-    if (mapRef.current && hasChanged) {
+    if (hasChanged) {
       const cameraUpdate: any = {};
       if (config.centerCoordinate) cameraUpdate.centerCoordinate = config.centerCoordinate;
       if (config.zoomLevel !== undefined) cameraUpdate.zoomLevel = config.zoomLevel;
       if (config.pitch !== undefined) cameraUpdate.pitch = config.pitch;
       if (config.heading !== undefined) cameraUpdate.heading = config.heading;
       if (config.animationDuration !== undefined) cameraUpdate.animationDuration = config.animationDuration;
-      (mapRef.current as any).setCamera(cameraUpdate);
+      try {
+        if (!mapReadyRef.current) {
+          pendingCameraConfigs.current.push({ config, forced, controllerId });
+          return;
+        }
+
+        if (cameraRef.current && typeof cameraRef.current.setCamera === 'function') {
+          cameraRef.current.setCamera(cameraUpdate);
+        } else if (mapRef.current && typeof (mapRef.current as any).setCamera === 'function') {
+          (mapRef.current as any).setCamera(cameraUpdate);
+        }
+      } catch (e) {
+        try {
+          console.warn('MapView setCamera error', e);
+        } catch (_) {}
+      }
     }
   };
 
@@ -176,6 +194,7 @@ export function MapViewProvider({
   };
 
   const notifyMapReady = () => {
+    mapReadyRef.current = true;
     if (!pendingCameraConfigs.current || pendingCameraConfigs.current.length === 0) return;
     pendingCameraConfigs.current.forEach((entry, idx) => {
       setTimeout(() => {
@@ -300,6 +319,7 @@ return padding;
 
   const contextValue: MapViewContextType = {
     mapRef,
+    cameraRef,
     centerCoordinate,
     zoomLevel,
     pitch,

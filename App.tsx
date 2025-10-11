@@ -1,14 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, TouchableOpacity, Text, Modal, Alert, Dimensions } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  Modal,
+  Alert,
+  Dimensions,
+  StatusBar,
+} from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as DocumentPicker from "expo-document-picker";
 import { parseGPX } from "./utils/gpxParser";
-import { getDistanceMeters, getDistanceBetweenPoints, computeBearingTo } from "./app/utils/geo";
+import {
+  getDistanceMeters,
+  getDistanceBetweenPoints,
+  computeBearingTo,
+} from "./app/utils/geo";
 import LocationTimeoutModal from "./app/ui/Modals/LocationTimeoutModal";
 import LocationErrorModal from "./app/ui/Modals/LocationErrorModal";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { PortalProvider } from '@gorhom/portal';
+import { Portal } from '@gorhom/portal';
 
- 
 import MapContainer from "./components/MapContainer";
 import ControlButtons from "./components/ControlButtons";
 import ExpandableSearch from "./components/ExpandableSearch";
@@ -18,14 +33,22 @@ import RouteDrawer from "./components/RouteDrawer";
 import POIDrawer from "./components/POIDrawer";
 import MultiStepRouteDrawer from "./components/MultiStepRouteDrawer";
 import NavigationGuidance from "./components/NavigationGuidance";
+import PedestrianGuidance from "./components/PedestrianGuidance";
+import BicycleGuidance from "./components/BicycleGuidance";
+import TransitGuidance from "./components/TransitGuidance";
 import ProgressSidebar from "./components/ProgressSidebar";
 import LocationInfoDrawer from "./components/LocationInfoDrawer";
 import FavoritesDrawer from "./components/FavoritesDrawer";
 import NavigationStepDrawer from "./components/NavigationStepDrawer";
 import ArrivalDrawer from "./components/ArrivalDrawer";
 import ParkingDrawer from "./components/ParkingDrawer";
+import SignalOverlay from "./components/SignalOverlay";
+import MyParkingDrawer from "./components/MyParkingDrawer";
+import MyPositionDrawer from "./components/MyPositionDrawer";
 import { MapViewProvider } from "./contexts/MapViewContext";
 import { LabsProvider } from "./contexts/LabsContext";
+import { ThemeProvider } from "./components/ui/ThemeContext";
+import { DrawerProvider } from "./components/ui/DrawerContext";
 import { useLocationAndNavigation } from "./hooks/useLocationAndNavigation";
 import { useMapControls } from "./hooks/useMapControls";
 import { OverpassPOI, OverpassService } from "./services/OverpassService";
@@ -38,112 +61,139 @@ import ResumeTripModal from "./components/ResumeTripModal";
 import { SafetyTestConfig } from "./config/SafetyTestConfig";
 import styles from "./style/appStyles";
 import { useRoutingCache } from "./app/hooks/useRoutingCache";
+import { ParkingLocationStorage } from "./services/ParkingLocationStorage";
+import { LogBox } from "react-native";
+import { enableLayoutAnimations } from "react-native-reanimated";
+
+LogBox.ignoreLogs([
+  "[Reanimated] Reading from `value` during component render.",
+]);
+
+enableLayoutAnimations(false);
 
 export default function Map() {
   return (
-    <LabsProvider>
-      <MapViewProvider>
-        <MapContent />
-      </MapViewProvider>
-    </LabsProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <PortalProvider>
+          <ThemeProvider>
+            <DrawerProvider>
+              <LabsProvider>
+                <MapViewProvider>
+                  <MapContent />
+                </MapViewProvider>
+              </LabsProvider>
+            </DrawerProvider>
+          </ThemeProvider>
+        </PortalProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 function MapContent() {
-  const [showLocationTimeoutModal, setShowLocationTimeoutModal] =
-    useState(false);
-  const [locationTimeoutId, setLocationTimeoutId] =
-    useState<NodeJS.Timeout | null>(null);
+  const {
+    location,
+    heading,
+    headingAnim,
+    currentHeading,
+    error: locationError,
+    routeCoords,
+    destination,
+    routeInfo,
+    isCalculatingRoute,
+    directLineCoords,
+    nearestRoadPoint,
+    hasDirectLineSegment,
+    routeDirection,
+    handleLongPress,
+    setDestination,
+    getRoute,
+    getRouteNew,
+    getHybridRoute,
+    getMultiStepRoute,
+    getRouteFromCurrentLocation,
+    getHybridRouteFromCurrentLocation,
+    clearRoute,
+    clearRouteKeepDestination,
+    routeService,
+    startLocationTracking,
+    stopLocationTracking,
+    requestLocationPermission,
+  } = useLocationAndNavigation();
+
+  const [showLocationTimeoutModal, setShowLocationTimeoutModal] = useState(false);
+  const [locationTimeoutId, setLocationTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [showLocationErrorModal, setShowLocationErrorModal] = useState(false);
 
   const handleRetryLocation = async () => {
     setShowLocationTimeoutModal(false);
     setLocationTimeoutId(null);
     try {
-      await Location.requestForegroundPermissionsAsync();
+      await requestLocationPermission();
     } catch (e) {}
   };
 
   const handleContinueWithoutLocation = () => {
     setShowLocationTimeoutModal(false);
-    setLocationTimeoutId(null);
   };
-  const [showLocationErrorModal, setShowLocationErrorModal] = useState(false);
 
-  const {
-    location,
-    headingAnim,
-    destination,
-    routeCoords,
-    currentHeading,
-    setDestination,
-    getRoute,
-    getHybridRouteFromCurrentLocation,
-    directLineCoords,
-    nearestRoadPoint,
-    hasDirectLineSegment,
-    routeService,
-    clearRoute,
-    clearRouteKeepDestination,
-    routeDirection,
-    error: locationError,
-  } = useLocationAndNavigation();
+  const handleSelectLocationForSignal = (
+    callback: (location: { latitude: number; longitude: number }) => void,
+    onCancel?: () => void
+  ) => {
+    setSignalLocationCallback(() => callback);
+    setSignalLocationCancelCallback(() => onCancel || (() => {}));
+    setIsSelectingLocationForSignal(true);
+    setSignalVisible(false);
+    
+    setShowMyPositionDrawer(false);
+    setShowLocationInfoDrawer(false);
+    setShowRouteDrawer(false);
+    setShowPOIDrawer(false);
+    setShowFavorites(false);
+    setShowMultiStepDrawer(false);
+    setShowGpxDrawer(false);
+    setShowMyParkingDrawer(false);
+  };
 
-  const [isUserLocationStale, setIsUserLocationStale] = useState(true);
+  const handleMapTapForSignal = (coordinate: { latitude: number; longitude: number }) => {
+    if (isSelectingLocationForSignal && signalLocationCallback) {
+      setPendingSignalLocation(coordinate);
+      setShowSignalLocationValidation(true);
+    }
+  };
 
-  useEffect(() => {
-    if (routeService && routeService.lastRawRouteData) {
-      const navData = routeService.getNavigationData();
-      if (navData) {
-        setNavigationData(navData);
-      }
+  const handleConfirmSignalLocation = () => {
+    if (pendingSignalLocation && signalLocationCallback) {
+      signalLocationCallback(pendingSignalLocation);
+      setIsSelectingLocationForSignal(false);
+      setSignalLocationCallback(null);
+      setSignalLocationCancelCallback(null);
+      setPendingSignalLocation(null);
+      setShowSignalLocationValidation(false);
+      setSignalVisible(true);
     }
-  }, [routeService?.lastRawRouteData]);
+  };
 
-  useEffect(() => {
-    if (!location && !showLocationTimeoutModal && !locationTimeoutId) {
-      const timeout = setTimeout(() => {
-        if (!location) {
-          setShowLocationTimeoutModal(true);
-        }
-      }, 10000);
-      setLocationTimeoutId(timeout);
+  const handleCancelSignalLocation = () => {
+    if (signalLocationCancelCallback) {
+      signalLocationCancelCallback();
     }
-    if (location && locationTimeoutId) {
-      clearTimeout(locationTimeoutId);
-      setLocationTimeoutId(null);
-    }
-    if (location === null && locationError) {
-      setShowLocationErrorModal(true);
-    } else {
-      setShowLocationErrorModal(false);
-    }
-    if (
-      location &&
-      typeof location.accuracy === "number" &&
-      location.accuracy < 1000
-    ) {
-      setIsUserLocationStale(false);
-    } else if (!location) {
-      setIsUserLocationStale(true);
-    }
-  }, [location, locationError, showLocationTimeoutModal, locationTimeoutId]);
-
-  useEffect(() => {
-    if (location === null && locationError) {
-      setShowLocationErrorModal(true);
-    } else {
-      setShowLocationErrorModal(false);
-    }
-  }, [location, locationError]);
-
-  useEffect(() => {
-    SafetyTestConfig.logConfiguration();
-  }, []);
+    setIsSelectingLocationForSignal(false);
+    setSignalLocationCallback(null);
+    setSignalLocationCancelCallback(null);
+    setPendingSignalLocation(null);
+    setShowSignalLocationValidation(false);
+    setSignalVisible(true);
+  };
 
   const [search, setSearch] = useState("");
   const [showRouteDrawer, setShowRouteDrawer] = useState(false);
+  const [routeDrawerHeight, setRouteDrawerHeight] = useState<number>(400);
   const [showFavorites, setShowFavorites] = useState(false);
   const [selectedDestination, setSelectedDestination] = useState<any>(null);
+  const [temporaryMarker, setTemporaryMarker] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const [showPOIDrawer, setShowPOIDrawer] = useState(false);
   const [selectedAmenityType, setSelectedAmenityType] = useState<string>("");
@@ -195,10 +245,12 @@ function MapContent() {
     if (importedRouteCoords && importedRouteCoords.length > 1) {
       const gpxSteps =
         NavigationService.convertGpxTrackToNavigationSteps(importedRouteCoords);
-      NavigationService.startNavigation(gpxSteps, routeService, "gpx");
+      const flat = importedRouteCoords.map((p) => [p.longitude, p.latitude]).flat();
+      NavigationService.startNavigation(gpxSteps, routeService, "gpx", flat);
       setNavigationSteps(gpxSteps);
       setCurrentStepIndex(0);
       setIsNavigating(true);
+      setGuidanceMode('gpx');
       setShowNavigationGuidance(true);
       startDrivingNavigation();
     }
@@ -211,7 +263,9 @@ function MapContent() {
   const [isRecalculatingRoute, setIsRecalculatingRoute] = useState(false);
 
   const offRouteRecalcRunningRef = useRef(false);
+  const cancelPendingRecalcRef = useRef(false);
   const [showNavigationGuidance, setShowNavigationGuidance] = useState(false);
+  const [guidanceMode, setGuidanceMode] = useState<string | null>(null);
   const [pendingRouteRequest, setPendingRouteRequest] = useState<{
     start: { latitude: number; longitude: number };
     end: { latitude: number; longitude: number };
@@ -229,6 +283,10 @@ function MapContent() {
     { latitude: number; longitude: number }[]
   >([]);
   const [progressPercentage, setProgressPercentage] = useState(0);
+  
+  const [pedestrianRouteCoords, setPedestrianRouteCoords] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
 
   const [showParkingDrawer, setShowParkingDrawer] = useState(false);
   const [parkingLocation, setParkingLocation] = useState<{
@@ -258,6 +316,7 @@ function MapContent() {
   const [isFutureLocationSearch, setIsFutureLocationSearch] = useState(false);
 
   const [showLocationInfoDrawer, setShowLocationInfoDrawer] = useState(false);
+  const [blockLocationInfoDrawer, setBlockLocationInfoDrawer] = useState(false);
   const [selectedAlternativeIndex, setSelectedAlternativeIndex] =
     useState<number>(0);
   const [selectedLocationCoordinate, setSelectedLocationCoordinate] =
@@ -281,8 +340,17 @@ function MapContent() {
     coordinate: Coordinate;
     name: string;
   } | null>(null);
+  const [showMyParkingDrawer, setShowMyParkingDrawer] = useState(false);
+  const [signalVisible, setSignalVisible] = useState(false);
+  const [isSelectingLocationForSignal, setIsSelectingLocationForSignal] = useState(false);
+  const [signalLocationCallback, setSignalLocationCallback] = useState<((location: { latitude: number; longitude: number }) => void) | null>(null);
+  const [signalLocationCancelCallback, setSignalLocationCancelCallback] = useState<(() => void) | null>(null);
+  const [pendingSignalLocation, setPendingSignalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showSignalLocationValidation, setShowSignalLocationValidation] = useState(false);
 
   const [isParkingAnimating, setIsParkingAnimating] = useState(false);
+
+  const [showMyPositionDrawer, setShowMyPositionDrawer] = useState(false);
 
   const [showNavigationSearch, setShowNavigationSearch] = useState(false);
 
@@ -348,6 +416,8 @@ function MapContent() {
       }, 350);
     }
   };
+  
+
   useEffect(() => {
     (async () => {
       const trip = await LastTripStorage.load();
@@ -359,6 +429,12 @@ function MapContent() {
       ) {
         setLastTrip(trip);
         setResumeModalVisible(true);
+      }
+    })();
+    (async () => {
+      const saved = await ParkingLocationStorage.load();
+      if (saved) {
+        setSelectedParking({ coordinate: saved.coordinate, name: saved.name || "Parking sauvegardé" });
       }
     })();
   }, []);
@@ -402,8 +478,6 @@ function MapContent() {
       }
     }
   };
-
-  
 
   const checkTripSafety = (durationInMinutes: number) => {
     if (durationInMinutes > SafetyTestConfig.LONG_TRIP_THRESHOLD_MINUTES) {
@@ -451,10 +525,30 @@ function MapContent() {
         startDrivingNavigation();
       }
 
+      let flatCoordsForStart: number[] | undefined = undefined;
+      try {
+        const raw = (routeService as any)?.lastRawRouteData;
+        const coordsArr: [number, number][] = [];
+        if (raw) {
+          if (raw.features && raw.features[0] && raw.features[0].geometry && raw.features[0].geometry.coordinates) {
+            const seq = raw.features[0].geometry.coordinates as [number, number][];
+            seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+          } else if (raw.routes && raw.routes[0] && raw.routes[0].geometry && raw.routes[0].geometry.coordinates) {
+            const seq = raw.routes[0].geometry.coordinates as [number, number][];
+            seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+          }
+        }
+        if ((!coordsArr || coordsArr.length === 0) && routeService && Array.isArray((routeService as any).routeCoords) && (routeService as any).routeCoords.length > 0) {
+          ((routeService as any).routeCoords as any[]).forEach((c: any) => coordsArr.push([c.longitude, c.latitude]));
+        }
+        if (coordsArr.length > 0) flatCoordsForStart = coordsArr.flat();
+      } catch (e) {}
+
       NavigationService.startNavigation(
         navigationSteps,
         routeService,
-        osrmMode
+        osrmMode,
+        flatCoordsForStart
       );
       setIsNavigating(true);
       setShowMultiStepDrawer(false);
@@ -689,6 +783,8 @@ function MapContent() {
     navigationMode,
     startWalkingNavigation,
     startDrivingNavigation,
+    startBicycleNavigation,
+    startTransitNavigation,
     startNavigationForMode,
     stopNavigation,
     adjustNavigationCamera,
@@ -696,6 +792,40 @@ function MapContent() {
     showRecenterPrompt,
     manualRecenter,
   } = useMapControls();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (
+          isNavigating &&
+          navigationMode === "walking" &&
+          destination &&
+          routeCoords &&
+          routeCoords.length === 0 &&
+          !isCalculatingRoute &&
+          !pendingRouteRequest
+        ) {
+          setPendingRouteRequest({
+            start: { latitude: location?.latitude || 0, longitude: location?.longitude || 0 },
+            end: { latitude: destination.latitude, longitude: destination.longitude },
+            mode: 'walking',
+          });
+
+          const ok = await getHybridRouteFromCurrentLocation(destination, 'walking');
+
+          setPendingRouteRequest(null);
+
+          if (ok) {
+            const navData = (routeService as any)?.getNavigationData?.();
+            if (navData) setNavigationData(navData);
+            setFreshRouteData((routeService as any)?.lastRawRouteData || null);
+          }
+        }
+      } catch (e) {
+        setPendingRouteRequest(null);
+      }
+    })();
+  }, [isNavigating, navigationMode, destination, routeCoords, isCalculatingRoute, pendingRouteRequest]);
 
   const [cameraHeadingOverride, setCameraHeadingOverride] = useState<
     number | null
@@ -769,7 +899,7 @@ function MapContent() {
       !isParkingAnimating
     ) {
       const delayBeforeFollow = selectedParking ? 2000 : 0;
-      
+
       setTimeout(() => {
         if (isFollowingUser && !selectedParking && !isParkingAnimating) {
           followUserLocation(location);
@@ -795,7 +925,7 @@ function MapContent() {
 
       if (currentNavState.nextStep && currentNavState.isNavigating) {
         const nextStepLocation = {
-          latitude: currentNavState.nextStep.coordinates[1], 
+          latitude: currentNavState.nextStep.coordinates[1],
           longitude: currentNavState.nextStep.coordinates[0],
         };
 
@@ -839,6 +969,12 @@ function MapContent() {
     const handleNavigationUpdate = (navigationState: any) => {
       setNavigationSteps(navigationState.steps);
       setCurrentStepIndex(navigationState.currentStepIndex);
+
+      try {
+        if (typeof navigationState.isNavigating === 'boolean') {
+          setIsNavigating(!!navigationState.isNavigating);
+        }
+      } catch (e) {}
 
       if (navigationState.isNavigating && !isMapNavigating) {
         if (navigationMode === "walking") {
@@ -885,6 +1021,7 @@ function MapContent() {
             offRouteRecalcRunningRef.current = true;
             (async () => {
               try {
+                cancelPendingRecalcRef.current = false;
                 setIsRecalculatingRoute(true);
 
                 const loc = navigationState.currentLocation || location;
@@ -914,6 +1051,11 @@ function MapContent() {
                   "driving"
                 );
                 if (ok) {
+                  if (cancelPendingRecalcRef.current) {
+                    setIsRecalculatingRoute(false);
+                    offRouteRecalcRunningRef.current = false;
+                    return;
+                  }
                   const fetched = (routeService as any).lastRawRouteData;
                   try {
                     const newSteps =
@@ -923,6 +1065,13 @@ function MapContent() {
                           .map((c: any) => [c.longitude, c.latitude])
                           .flat()
                       : undefined;
+
+                    if (cancelPendingRecalcRef.current) {
+                      setIsRecalculatingRoute(false);
+                      offRouteRecalcRunningRef.current = false;
+                      return;
+                    }
+
                     await NavigationService.startNavigation(
                       newSteps,
                       routeService,
@@ -953,14 +1102,15 @@ function MapContent() {
                     );
 
                     setPendingRouteRequest(null);
+                    setGuidanceMode('driving');
                     setShowNavigationGuidance(true);
                   } catch (e) {}
-                } else {
                 }
               } catch (err) {
               } finally {
                 setIsRecalculatingRoute(false);
                 offRouteRecalcRunningRef.current = false;
+                cancelPendingRecalcRef.current = false;
               }
             })();
           }
@@ -1077,8 +1227,6 @@ function MapContent() {
     gpxStartPoint?.longitude,
   ]);
 
-  
-
   const handleSelectLocation = async (result: any) => {
     const wasFollowing = disableFollowModeTemporarily();
     setWasFollowingBeforeRoute(wasFollowing);
@@ -1086,22 +1234,25 @@ function MapContent() {
     setHasReachedDestination(false);
     setShowArrivalDrawer(false);
 
+    clearNavigationCache();
+    setFreshRouteData(null);
+
     const coord = {
       latitude: result.latitude,
       longitude: result.longitude,
     };
 
     setDestination(coord);
-
     if (location) {
-      await getHybridRouteFromCurrentLocation(coord, "driving");
-
-      fitToRoute(
-        { latitude: location.latitude, longitude: location.longitude },
-        coord,
-        routeCoords,
-        true
-      );
+      try {
+        const adjustedCoord = getAdjustedCoordinate(
+          coord,
+          undefined,
+          undefined,
+          0
+        );
+        animateToCoordinate(adjustedCoord);
+      } catch (e) {}
     } else {
       const adjustedCoord = getAdjustedCoordinate(
         coord,
@@ -1121,7 +1272,21 @@ function MapContent() {
     });
   };
 
+  const handleRefreshRoute = async () => {
+    if (!selectedDestination || !location) return;
+    
+    const coord = {
+      latitude: selectedDestination.latitude,
+      longitude: selectedDestination.longitude,
+    };
+    
+    await getHybridRouteFromCurrentLocation(coord, 'driving');
+  };
+
   const handleShowRoute = (result: any) => {
+    clearNavigationCache();
+    setFreshRouteData(null);
+    
     setSelectedDestination({
       title: result.title,
       subtitle: result.subtitle,
@@ -1135,7 +1300,14 @@ function MapContent() {
   };
 
   const handleMapPress = (coordinate: Coordinate) => {
+    if (isSelectingLocationForSignal) {
+      handleMapTapForSignal(coordinate);
+      return;
+    }
+
     disableFollowModeTemporarily();
+
+    if (blockLocationInfoDrawer) return;
 
     const screenHeight = Dimensions.get("window").height;
     const latitudeDelta = 0.01;
@@ -1157,6 +1329,9 @@ function MapContent() {
 
     setHasReachedDestination(false);
     setShowArrivalDrawer(false);
+
+    clearNavigationCache();
+    setFreshRouteData(null);
 
     if (!isNavigating) {
       const wasFollowing = disableFollowModeTemporarily();
@@ -1190,10 +1365,10 @@ function MapContent() {
 
     if (step && step.coordinates) {
       const coord = {
-        latitude: step.coordinates[1],  
-        longitude: step.coordinates[0], 
+        latitude: step.coordinates[1],
+        longitude: step.coordinates[0],
       };
-      const adjustedCoord = getAdjustedCoordinate(coord, 17, undefined, 250); 
+      const adjustedCoord = getAdjustedCoordinate(coord, 17, undefined, 250);
       animateToCoordinate(adjustedCoord, 17);
     }
   };
@@ -1252,10 +1427,47 @@ function MapContent() {
                 navigationSteps
               );
 
+              let flatCoordsArrival: number[] | undefined = undefined;
+              try {
+                const raw = routingResult.data;
+                const coordsArr: [number, number][] = [];
+                if (raw) {
+                  if (
+                    raw.features &&
+                    raw.features[0] &&
+                    raw.features[0].geometry &&
+                    raw.features[0].geometry.coordinates
+                  ) {
+                    const seq = raw.features[0].geometry.coordinates as [number, number][];
+                    seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+                  } else if (
+                    raw.routes &&
+                    raw.routes[0] &&
+                    raw.routes[0].geometry &&
+                    raw.routes[0].geometry.coordinates
+                  ) {
+                    const seq = raw.routes[0].geometry.coordinates as [number, number][];
+                    seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+                  }
+                }
+                if (
+                  (!coordsArr || coordsArr.length === 0) &&
+                  routeService &&
+                  Array.isArray((routeService as any).routeCoords) &&
+                  (routeService as any).routeCoords.length > 0
+                ) {
+                  ((routeService as any).routeCoords as any[]).forEach((c: any) =>
+                    coordsArr.push([c.longitude, c.latitude])
+                  );
+                }
+                if (coordsArr.length > 0) flatCoordsArrival = coordsArr.flat();
+              } catch (e) {}
+
               NavigationService.startNavigation(
                 navigationSteps,
                 routeService,
-                navigationMode || "driving"
+                navigationMode || "driving",
+                flatCoordsArrival
               );
 
               setNavigationSteps(navigationSteps);
@@ -1455,10 +1667,47 @@ function MapContent() {
                     waypoints
                   );
 
+                  let flatCoordsStop: number[] | undefined = undefined;
+                  try {
+                    const raw = routingResult.data;
+                    const coordsArr: [number, number][] = [];
+                    if (raw) {
+                      if (
+                        raw.features &&
+                        raw.features[0] &&
+                        raw.features[0].geometry &&
+                        raw.features[0].geometry.coordinates
+                      ) {
+                        const seq = raw.features[0].geometry.coordinates as [number, number][];
+                        seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+                      } else if (
+                        raw.routes &&
+                        raw.routes[0] &&
+                        raw.routes[0].geometry &&
+                        raw.routes[0].geometry.coordinates
+                      ) {
+                        const seq = raw.routes[0].geometry.coordinates as [number, number][];
+                        seq.forEach((c) => coordsArr.push([c[0], c[1]]));
+                      }
+                    }
+                    if (
+                      (!coordsArr || coordsArr.length === 0) &&
+                      routeService &&
+                      Array.isArray((routeService as any).routeCoords) &&
+                      (routeService as any).routeCoords.length > 0
+                    ) {
+                      ((routeService as any).routeCoords as any[]).forEach((c: any) =>
+                        coordsArr.push([c.longitude, c.latitude])
+                      );
+                    }
+                    if (coordsArr.length > 0) flatCoordsStop = coordsArr.flat();
+                  } catch (e) {}
+
                   NavigationService.startNavigation(
                     navigationSteps,
                     routeService,
-                    navigationMode || "driving"
+                    navigationMode || "driving",
+                    flatCoordsStop
                   );
 
                   setNavigationSteps(navigationSteps);
@@ -1810,18 +2059,6 @@ function MapContent() {
     setShowPOIDrawer(false);
     setShowRouteDrawer(true);
   };
-
-  useEffect(() => {
-    if (showRouteDrawer && selectedDestination) {
-      const coord = {
-        latitude: selectedDestination.latitude,
-        longitude: selectedDestination.longitude,
-      };
-      const adjusted = getAdjustedCoordinate(coord, undefined, undefined, 180);
-      animateToCoordinate(adjusted, 15);
-    }
-  }, [showRouteDrawer, selectedDestination]);
-
   const handlePOIRadiusChange = (radius: number) => {
     setPOIRadius(radius);
   };
@@ -1833,78 +2070,126 @@ function MapContent() {
   const handleStartNavigation = async (transportMode: string = "driving") => {
     if (!selectedDestination || !location) return;
 
-    if (transportMode === "walking") startWalkingNavigation();
-    else startDrivingNavigation();
+    if (transportMode === "walking") {
+      setPedestrianRouteCoords([]);
+      startWalkingNavigation();
+    } else if (transportMode === "bicycling") {
+      startBicycleNavigation();
+    } else if (transportMode === "transit") {
+      startTransitNavigation();
+    } else {
+      startDrivingNavigation();
+    }
+    setGuidanceMode(transportMode === 'walking' ? 'walking' : transportMode === 'transit' ? 'transit' : transportMode === 'bicycling' ? 'bicycle' : 'driving');
     setIsNavigating(true);
+
+    if (transportMode !== "walking") {
+      await ParkingLocationStorage.clear();
+      setSelectedParking(null);
+    }
 
     setShowRouteDrawer(false);
     setShowNavigationGuidance(true);
 
-    if (freshRouteData) {
-      const navData = {
-        routeData: freshRouteData,
-        totalDuration: extractTotalDuration(freshRouteData),
-        totalDistance: extractTotalDistance(freshRouteData),
-        steps: [],
+    let routeDataToUse = (routeService?.lastRawRouteData) || freshRouteData || null;
+    
+    if (!routeDataToUse && routeService?.routeCoords && routeService.routeCoords.length > 0) {
+      const coords = routeService.routeCoords.map((c: any) => [c.longitude, c.latitude]);
+      routeDataToUse = {
+        routes: [{
+          geometry: {
+            coordinates: coords,
+            type: 'LineString'
+          },
+          legs: [{
+            steps: [{
+              maneuver: {
+                type: 'depart',
+                location: coords[0],
+                instruction: 'Départ'
+              },
+              distance: 0,
+              duration: 0,
+              name: '',
+              geometry: {
+                coordinates: coords,
+                type: 'LineString'
+              }
+            }]
+          }],
+          distance: (routeService as any).totalDistance || 0,
+          duration: (routeService as any).totalDuration || 0
+        }]
       };
-
-      setNavigationData(navData);
-      setPendingRouteRequest(null);
-      setIsRecalculatingRoute(false);
-
+    }
+    
+    if (!routeDataToUse) {
+      const start = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+      };
+      const end = {
+        latitude: selectedDestination.latitude,
+        longitude: selectedDestination.longitude,
+      };
+      setPendingRouteRequest({ start, end, mode: transportMode });
       return;
     }
 
-    const hasMatchingRouteData =
-      routeService &&
-      routeService.lastRawRouteData &&
-      routeService.destination &&
-      routeService.destination.latitude === selectedDestination.latitude &&
-      routeService.destination.longitude === selectedDestination.longitude;
-
-    if (hasMatchingRouteData) {
-      const navData = routeService.getNavigationData();
-      if (navData) {
-        setNavigationData(navData);
-        setPendingRouteRequest(null);
-        setIsRecalculatingRoute(false);
-        return;
+    try {
+      if (routeService && typeof (routeService as any).updateRouteData === 'function') {
+        (routeService as any).updateRouteData(routeDataToUse);
+      } else if (routeService) {
+        (routeService as any).lastRawRouteData = routeDataToUse;
       }
-    }
 
-    const start = {
-      latitude: location.latitude,
-      longitude: location.longitude,
-    };
-    const end = {
-      latitude: selectedDestination.latitude,
-      longitude: selectedDestination.longitude,
-    };
-
-    const cachedData = getCachedNavigationData(start, end, transportMode);
-
-    if (cachedData && cachedData.routeData && cachedData.navigationSteps) {
-      if (routeService) {
-        (routeService as any).lastRawRouteData = cachedData.routeData;
-        const navData = routeService.getNavigationData();
-        if (navData) {
-          setNavigationData(navData);
-        } else {
-          const directNavData = {
-            routeData: cachedData.routeData,
-            totalDuration: 0,
-            totalDistance: 0,
-            steps: cachedData.navigationSteps || [],
-          };
-          setNavigationData(directNavData);
+      const navigationSteps = NavigationService.convertRouteToNavigationSteps(routeDataToUse);
+     
+      let flatCoords: number[] | undefined = undefined;
+      try {
+        const coords: Array<{ latitude: number; longitude: number }> = [];
+        if (routeDataToUse.features?.[0]?.geometry?.coordinates) {
+          const seq = routeDataToUse.features[0].geometry.coordinates as [number, number][];
+          seq.forEach((c) => coords.push({ latitude: c[1], longitude: c[0] }));
+        } else if (routeDataToUse.routes?.[0]?.geometry?.coordinates) {
+          const seq = routeDataToUse.routes[0].geometry.coordinates as [number, number][];
+          seq.forEach((c) => coords.push({ latitude: c[1], longitude: c[0] }));
         }
-      } else {
+        if (coords.length === 0 && routeService?.routeCoords?.length > 0) {
+          routeService.routeCoords.forEach((c: any) => coords.push({ latitude: c.latitude, longitude: c.longitude }));
+        }
+        if (coords.length > 0) {
+          flatCoords = coords.map((c) => [c.longitude, c.latitude]).flat();
+        }
+      } catch (err) {
       }
 
+      
+      await NavigationService.startNavigation(
+        navigationSteps,
+        routeService,
+        transportMode === 'walking' ? 'walking' : transportMode,
+        flatCoords,
+        selectedDestination || undefined
+      );
+
+      setCurrentStepIndex(0);
+
+      const navData: any = {
+        routeData: routeDataToUse,
+        totalDuration: extractTotalDuration(routeDataToUse),
+        totalDistance: extractTotalDistance(routeDataToUse),
+        steps: [],
+      };
+      setNavigationData(navData);
       setPendingRouteRequest(null);
       setIsRecalculatingRoute(false);
-    } else {
-      setPendingRouteRequest({ start, end, mode: transportMode });
+    } catch (e) {
+      setPendingRouteRequest({
+        start: { latitude: location.latitude, longitude: location.longitude },
+        end: { latitude: selectedDestination.latitude, longitude: selectedDestination.longitude },
+        mode: transportMode,
+      });
     }
 
     if (location) {
@@ -1918,6 +2203,7 @@ function MapContent() {
   };
 
   const handleStopNavigation = () => {
+    cancelPendingRecalcRef.current = true;
     NavigationService.stopNavigation();
     stopNavigation();
     setIsNavigating(false);
@@ -1928,6 +2214,8 @@ function MapContent() {
     cleanupSafetyTimers();
 
     clearRoute();
+    
+    setPedestrianRouteCoords([]);
 
     clearNavigationCache();
 
@@ -2024,7 +2312,8 @@ function MapContent() {
               longitude: destination.longitude,
             },
             routeCoords,
-            true
+            true,
+            routeDrawerHeight
           );
         } catch (e) {
           await getHybridRouteFromCurrentLocation(destination, osrmMode);
@@ -2284,6 +2573,7 @@ function MapContent() {
 
   return (
     <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <LocationTimeoutModal
         visible={showLocationTimeoutModal}
         onRetry={handleRetryLocation}
@@ -2317,6 +2607,7 @@ function MapContent() {
               ? { latitude: location.latitude, longitude: location.longitude }
               : null
           }
+          onBlockLocationInfo={(v: boolean) => setBlockLocationInfoDrawer(v)}
           onCameraMove={(coordinate, offset) => {
             if (coordinate) {
               setTimeout(() => {
@@ -2354,6 +2645,12 @@ function MapContent() {
               }
             }
           }}
+          onShowTemporaryMarker={(r) => {
+            if (r) setTemporaryMarker({ latitude: r.latitude, longitude: r.longitude });
+            else setTemporaryMarker(null);
+          }}
+          onDisableFollow={() => { try { disableFollowModeTemporarily(); } catch (e) {} }}
+          onRestoreFollow={() => { try { reactivateFollowMode(); } catch (e) {} }}
           onImportGpx={handleImportGpx}
         />
       )}
@@ -2422,6 +2719,12 @@ function MapContent() {
               }
             }
           }}
+          onShowTemporaryMarker={(r) => {
+            if (r) setTemporaryMarker({ latitude: r.latitude, longitude: r.longitude });
+            else setTemporaryMarker(null);
+          }}
+          onDisableFollow={() => { try { disableFollowModeTemporarily(); } catch (e) {} }}
+          onRestoreFollow={() => { try { reactivateFollowMode(); } catch (e) {} }}
         />
       )}
 
@@ -2482,9 +2785,14 @@ function MapContent() {
         <MapContainer
           mapHeadingOverride={cameraHeadingOverride}
           location={location}
+          temporaryMarker={temporaryMarker}
           headingAnim={headingAnim}
           destination={destination}
-          routeCoords={routeCoords}
+          routeCoords={(() => {
+            const coords = (guidanceMode === 'walking' || guidanceMode === 'bicycle') ? pedestrianRouteCoords : routeCoords;
+            
+            return coords;
+          })()}
           alternativeRoutes={
             routeService ? routeService.lastAlternatives || [] : []
           }
@@ -2502,7 +2810,7 @@ function MapContent() {
           isFirstLoad={!location}
           isNavigating={isNavigating}
           navigationMode={navigationMode}
-          showDirectLine={isNavigating && navigationMode === "walking"}
+          showDirectLine={isNavigating && (navigationMode === "walking" || guidanceMode === "walking") && (!pedestrianRouteCoords || pedestrianRouteCoords.length === 0)}
           navigationSteps={navigationSteps}
           currentStepIndex={currentStepIndex}
           onNavigationStepPress={handleNavigationStepPress}
@@ -2512,10 +2820,37 @@ function MapContent() {
           showLocationPoint={showLocationPoint}
           selectedLocationCoordinate={selectedLocationCoordinate}
           selectedParking={selectedParking}
+          onParkingPress={() => setShowMyParkingDrawer(true)}
           completedRouteCoords={completedRouteCoords}
           remainingRouteCoords={remainingRouteCoords}
           progressPercentage={progressPercentage}
           routeDirection={routeDirection}
+          onUserLocationPress={() => {
+            setShowLocationInfoDrawer(false);
+            setShowMyPositionDrawer(true);
+          }}
+        />
+        <MyParkingDrawer
+          visible={showMyParkingDrawer}
+          parking={selectedParking}
+          onClose={() => setShowMyParkingDrawer(false)}
+          onRemove={async () => {
+            await ParkingLocationStorage.clear();
+            setSelectedParking(null);
+            setShowMyParkingDrawer(false);
+          }}
+          onNavigate={() => {
+            if (selectedParking) {
+              setShowMyParkingDrawer(false);
+              const dest = {
+                title: selectedParking.name,
+                subtitle: '',
+                latitude: selectedParking.coordinate.latitude,
+                longitude: selectedParking.coordinate.longitude,
+              };
+              handleSelectLocation(dest as any);
+            }
+          }}
         />
 
         {isNavigating && (
@@ -2537,6 +2872,7 @@ function MapContent() {
           onClose={handleCloseDrawer}
           onStartNavigation={handleStartNavigation}
           onTransportModeChange={handleTransportModeChange}
+          routeInfo={routeService?.routeInfo || null}
           alternatives={routeService ? routeService.lastAlternatives || [] : []}
           selectedAlternativeIndex={selectedAlternativeIndex}
           onSelectAlternative={async (index: number) => {
@@ -2555,7 +2891,8 @@ function MapContent() {
                   longitude: selectedDestination.longitude,
                 },
                 routeCoords,
-                true
+                true,
+                routeDrawerHeight
               );
             }
           }}
@@ -2577,7 +2914,8 @@ function MapContent() {
                   longitude: selectedDestination.longitude,
                 },
                 activeCoords,
-                true
+                true,
+                routeDrawerHeight
               );
             }
           }}
@@ -2592,6 +2930,25 @@ function MapContent() {
           lastRequestTimings={
             routeService ? routeService.lastRequestTimings : undefined
           }
+          isFromCache={routeService ? routeService.isFromCache : false}
+          onRefresh={handleRefreshRoute}
+          onDrawerHeightChange={(height) => {
+            setRouteDrawerHeight(height);
+            if (location && selectedDestination && routeCoords && routeCoords.length > 0) {
+              setTimeout(() => {
+                fitToRoute(
+                  { latitude: location.latitude, longitude: location.longitude },
+                  {
+                    latitude: selectedDestination.latitude,
+                    longitude: selectedDestination.longitude,
+                  },
+                  routeCoords,
+                  true,
+                  height
+                );
+              }, 200);
+            }
+          }}
         />
 
         <GPXDrawer
@@ -2628,6 +2985,7 @@ function MapContent() {
                 end: start,
                 mode: navigationMode || "driving",
               });
+              setGuidanceMode(navigationMode === 'walking' ? 'walking' : navigationMode === 'transit' ? 'transit' : navigationMode === 'bicycle' ? 'bicycle' : 'driving');
               setShowNavigationGuidance(true);
               setGpxStartPoint(start);
             }
@@ -2671,6 +3029,23 @@ function MapContent() {
           onClearRoute={handleClearGpxOverlays}
           onStopNavigation={handleStopNavigation}
           onStartFollowingTrack={handleStartFollowingGpx}
+        />
+
+        <MyPositionDrawer
+          visible={showMyPositionDrawer}
+          location={location}
+          onClose={() => setShowMyPositionDrawer(false)}
+          onShowRoute={(poi, transportMode) => {
+            setShowMyPositionDrawer(false);
+            (async () => {
+              await handlePOIRoute(poi, transportMode);
+            })();
+          }}
+          onSaveParking={async ({ coordinate, name }) => {
+            await ParkingLocationStorage.save({ coordinate, name: name || "Place de stationnement", savedAt: Date.now() });
+            setSelectedParking({ coordinate, name: name || "Place de stationnement" });
+          }}
+          onReportProblem={() => setSignalVisible(true)}
         />
 
         <GPXStartDrawer
@@ -2806,8 +3181,46 @@ function MapContent() {
           totalDuration={totalDuration}
         />
 
-        <NavigationGuidance
-          visible={showNavigationGuidance || isNavigating || isMapNavigating}
+  {((guidanceMode || pendingRouteRequest?.mode) === 'transit') ? (
+          <TransitGuidance
+            visible={showNavigationGuidance || isNavigating}
+            onStop={handleStopNavigation}
+            currentLocation={location}
+            routeRequest={pendingRouteRequest}
+            routeData={routeService ? routeService.lastRawRouteData : null}
+            navigationData={navigationData}
+            onRouteReady={() => {
+              setPendingRouteRequest(null);
+              setIsNavigating(true);
+              setIsRecalculatingRoute(false);
+            }}
+          />
+        ) : ((guidanceMode || pendingRouteRequest?.mode) === 'walking') ? (
+          <PedestrianGuidance
+            visible={showNavigationGuidance || isNavigating}
+            onStop={handleStopNavigation}
+            currentLocation={location}
+            destination={destination || (pendingRouteRequest ? { latitude: pendingRouteRequest.end.latitude, longitude: pendingRouteRequest.end.longitude } : null)}
+            nearestRoadPoint={nearestRoadPoint}
+            onRouteCalculated={(pedestrianRouteCoords) => {
+              setPedestrianRouteCoords(pedestrianRouteCoords);
+            }}
+            onFindAmenity={handleSearchNearbyPOI}
+          />
+        ) : ((guidanceMode || pendingRouteRequest?.mode) === 'bicycle') ? (
+          <BicycleGuidance
+            visible={showNavigationGuidance || isNavigating}
+            onStop={handleStopNavigation}
+            currentLocation={location}
+            navigationData={navigationData}
+            destination={destination || (pendingRouteRequest ? { latitude: pendingRouteRequest.end.latitude, longitude: pendingRouteRequest.end.longitude } : null)}
+            onRouteCalculated={(bicycleRouteCoords) => {
+              setPedestrianRouteCoords(bicycleRouteCoords);
+            }}
+          />
+        ) : (
+          <NavigationGuidance
+          visible={((guidanceMode || pendingRouteRequest?.mode) === 'gpx') ? (showNavigationGuidance || isNavigating) : (showNavigationGuidance || isNavigating || isMapNavigating)}
           onStop={handleStopNavigation}
           onShowAllSteps={() => {
             if (
@@ -2849,9 +3262,8 @@ function MapContent() {
               offRouteRecalcRunningRef.current = false;
             }
           }}
-        />
+        />)}
 
-        
         <LocationInfoDrawer
           visible={showLocationInfoDrawer}
           coordinate={selectedLocationCoordinate}
@@ -2859,6 +3271,7 @@ function MapContent() {
           onStartRoute={handleStartRouteFromLocation}
           hasActiveRoute={!!destination || isNavigating}
           onShowLocationPoint={handleShowLocationPoint}
+          onBlockLocationInfo={(v: boolean) => setBlockLocationInfoDrawer(v)}
         />
 
         <NavigationStepDrawer
@@ -2902,6 +3315,14 @@ function MapContent() {
           onClose={handleCloseParkingDrawer}
           onParkingSelect={handleSelectParking}
           onNavigateToParking={handleNavigateToParking}
+        />
+
+        <SignalOverlay
+          visible={signalVisible}
+          onClose={() => setSignalVisible(false)}
+          userLocation={location ? { latitude: location.latitude, longitude: location.longitude } : null}
+          appVersion={"1.0.3"}
+          onSelectLocationOnMap={handleSelectLocationForSignal}
         />
 
         <Modal
@@ -3039,6 +3460,52 @@ function MapContent() {
               <Text style={styles.routingErrorText}>
                 {routeService.routingErrorMessage}
               </Text>
+            </View>
+          </View>
+        )}
+
+        {isSelectingLocationForSignal && !showSignalLocationValidation && (
+          <View style={styles.locationSelectionBannerContainer} pointerEvents="box-none">
+            <View style={styles.locationSelectionBanner}>
+              <MaterialIcons name="place" size={24} color="#007AFF" />
+              <Text style={styles.locationSelectionText}>
+                Tapotez sur la carte pour sélectionner la position du problème
+              </Text>
+              <TouchableOpacity
+                style={styles.cancelLocationSelection}
+                onPress={handleCancelSignalLocation}
+              >
+                <MaterialIcons name="close" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {showSignalLocationValidation && pendingSignalLocation && (
+          <View style={styles.locationSelectionOverlay}>
+            <View style={styles.locationValidationCard}>
+              <MaterialIcons name="place" size={32} color="#007AFF" />
+              <Text style={styles.validationTitle}>Confirmer la position</Text>
+              <Text style={styles.validationCoords}>
+                {pendingSignalLocation.latitude.toFixed(5)}, {pendingSignalLocation.longitude.toFixed(5)}
+              </Text>
+              <Text style={styles.validationSubtext}>
+                Cette position sera utilisée pour votre signalement
+              </Text>
+              <View style={styles.validationActions}>
+                <TouchableOpacity
+                  style={styles.validationBtnSecondary}
+                  onPress={handleCancelSignalLocation}
+                >
+                  <Text style={styles.validationBtnSecondaryText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.validationBtnPrimary}
+                  onPress={handleConfirmSignalLocation}
+                >
+                  <Text style={styles.validationBtnPrimaryText}>Confirmer</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}

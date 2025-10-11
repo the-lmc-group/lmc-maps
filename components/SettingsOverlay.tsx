@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Modal, SafeAreaView, View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Image, Animated } from "react-native";
 import { useLabs } from "../contexts/LabsContext";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { widgetConfigEmitter } from './navigationwidjets/WidgetManager';
+import ReactNativePickerModule from 'react-native';
 
 interface Props {
   visible: boolean;
@@ -16,6 +19,43 @@ export default function SettingsOverlay({ visible, onClose, onImportGpx }: Props
   const [labsVerboseLogging, setLabsVerboseLogging] = useState(false);
   const [labsExperimentalRouting, setLabsExperimentalRouting] = useState(false);
   const [labsShowDebugOverlays, setLabsShowDebugOverlays] = useState(false);
+  const WIDGETS_STORAGE_KEY = 'navigation_widgets_config_v1';
+  const [widgetsMasterEnabled, setWidgetsMasterEnabled] = useState(true);
+  const [widgetConfigs, setWidgetConfigs] = useState<Array<{ id: string; title: string; enabled: boolean }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(WIDGETS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setWidgetConfigs(parsed);
+        } else {
+          const defaults = [
+            { id: 'media', title: 'Media', enabled: true },
+            { id: 'weather', title: 'Weather', enabled: true },
+            { id: 'speed_advisory', title: 'Traffic', enabled: true },
+          ];
+          setWidgetConfigs(defaults);
+          await AsyncStorage.setItem(WIDGETS_STORAGE_KEY, JSON.stringify(defaults));
+        }
+      } catch (e) {}
+    })();
+    (async () => {
+      try {
+        const m = await AsyncStorage.getItem('navigation_widgets_master_v1');
+        if (m !== null) setWidgetsMasterEnabled(m === '1');
+      } catch (e) {}
+    })();
+  }, []);
+
+  const persistWidgetConfig = async (cfgs: any) => {
+    setWidgetConfigs(cfgs);
+    try {
+      await AsyncStorage.setItem(WIDGETS_STORAGE_KEY, JSON.stringify(cfgs));
+      widgetConfigEmitter.emit({ configs: cfgs });
+    } catch (e) {}
+  };
   const [pageStack, setPageStack] = useState<Array<{ key: string; title: string; props?: any }>>([{ key: 'root', title: 'Paramètres' }]);
   const pushPage = (page: { key: string; title: string; props?: any }) => setPageStack((s) => [...s, page]);
   const popPage = () => setPageStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
@@ -62,18 +102,6 @@ export default function SettingsOverlay({ visible, onClose, onImportGpx }: Props
           {}
           {currentPage.key === 'root' && (
             <View style={styles.centerBlock}>
-              <TouchableOpacity
-                style={styles.importRow}
-                onPress={() => pushPage({ key: 'display', title: 'Affichage' })}
-              >
-                <View style={styles.importText}>
-                  <Text style={styles.importTitle}>Affichage</Text>
-                  <Text style={styles.importSubtitle}>Paramètres d'apparence et thème.</Text>
-                </View>
-                <Text style={styles.versionChevron}>›</Text>
-              </TouchableOpacity>
-
-              <View style={{ height: 12 }} />
 
               <TouchableOpacity style={styles.importRow} onPress={() => pushPage({ key: 'gpx', title: 'Importer un GPX', props: { onImportGpx } })}>
                 <View style={styles.importText}>
@@ -84,6 +112,14 @@ export default function SettingsOverlay({ visible, onClose, onImportGpx }: Props
               </TouchableOpacity>
 
               <View style={{ height: 12 }} />
+
+              <TouchableOpacity style={styles.importRow} onPress={() => pushPage({ key: 'display', title: 'Apparence' })}>
+                <View style={styles.importText}>
+                  <Text style={styles.importTitle}>Apparence</Text>
+                  <Text style={styles.importSubtitle}>Options d'affichage et widjets.</Text>
+                </View>
+                <Text style={styles.versionChevron}>›</Text>
+              </TouchableOpacity>
 
               {}
               {labsUnlocked ? (
@@ -131,6 +167,41 @@ export default function SettingsOverlay({ visible, onClose, onImportGpx }: Props
                 </View>
                 <Text style={styles.versionChevron}>›</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={[styles.importRow, { marginTop: 10 }]} onPress={() => pushPage({ key: 'appearance', title: 'Apparence' })}>
+                <View style={styles.importText}>
+                  <Text style={styles.importTitle}>Widjets</Text>
+                  <Text style={styles.importSubtitle}>Afficher et choisir quels widjets sont actifs.</Text>
+                </View>
+                <Text style={styles.versionChevron}>›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {}
+          {currentPage.key === 'appearance' && (
+            <View style={{ paddingTop: 12 }}>
+              <View style={styles.optionRowSmall}>
+                <View style={styles.optionTextWrap}>
+                  <Text style={styles.optionTitle}>Afficher les widjets</Text>
+                  <Text style={styles.optionSubtitle}>Affiche les widjets sur l'écran de navigation.</Text>
+                </View>
+                <Switch value={widgetsMasterEnabled} onValueChange={async (v) => { setWidgetsMasterEnabled(v); try { await AsyncStorage.setItem('navigation_widgets_master_v1', v ? '1' : '0'); widgetConfigEmitter.emit({ masterEnabled: v }); } catch (e) {} }} />
+              </View>
+
+              <View style={{ height: 12 }} />
+              <Text style={styles.sectionTitle}>Liste des widjets</Text>
+              {widgetConfigs.map((w) => (
+                <View key={w.id} style={styles.optionRowSmall}>
+                  <View style={styles.optionTextWrap}>
+                    <Text style={styles.optionTitle}>{w.title}</Text>
+                    <Text style={styles.optionSubtitle}>Activer la récupération de données pour ce widjet.</Text>
+                  </View>
+                  <Switch value={w.enabled && widgetsMasterEnabled} onValueChange={(v) => {
+                    const next = widgetConfigs.map(cfg => cfg.id === w.id ? { ...cfg, enabled: v } : cfg);
+                    persistWidgetConfig(next);
+                  }} />
+                </View>
+              ))}
             </View>
           )}
 

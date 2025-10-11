@@ -21,6 +21,8 @@ export interface NominatimSearchResult {
   lat: string;
   lon: string;
   display_name: string;
+  class?: string;
+  type?: string;
   address: NominatimAddress;
   boundingbox: string[];
 }
@@ -33,6 +35,8 @@ export interface NominatimReverseResult {
   lat: string;
   lon: string;
   display_name: string;
+  class?: string;
+  type?: string;
   address: NominatimAddress;
 }
 
@@ -49,6 +53,8 @@ export class NominatimService {
     countryCode?: string;
     bounded?: boolean;
     viewbox?: string;
+    lat?: number;
+    lon?: number;
   }): Promise<NominatimSearchResult[]> {
     try {
       const params = new URLSearchParams({
@@ -69,6 +75,10 @@ export class NominatimService {
       if (options?.viewbox) {
         params.append('viewbox', options.viewbox);
       }
+      if (typeof options?.lat === 'number' && typeof options?.lon === 'number') {
+        params.append('lat', options.lat.toString());
+        params.append('lon', options.lon.toString());
+      }
 
       const response = await fetch(
         `${this.BASE_URL}/search?${params.toString()}`,
@@ -79,7 +89,38 @@ export class NominatimService {
         throw new Error(`Nominatim search failed: ${response.status}`);
       }
 
-      return await response.json();
+      const results: NominatimSearchResult[] = await response.json();
+
+      if (typeof options?.lat === 'number' && typeof options?.lon === 'number') {
+        const lat1 = options.lat;
+        const lon1 = options.lon;
+
+        const haversine = (aLat: number, aLon: number, bLat: number, bLon: number) => {
+          const R = 6371e3;
+          const φ1 = aLat * Math.PI / 180;
+          const φ2 = bLat * Math.PI / 180;
+          const Δφ = (bLat - aLat) * Math.PI / 180;
+          const Δλ = (bLon - aLon) * Math.PI / 180;
+
+          const aa = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                     Math.cos(φ1) * Math.cos(φ2) *
+                     Math.sin(Δλ/2) * Math.sin(Δλ/2);
+          const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1-aa));
+          return (R * c) / 1000;
+        };
+
+        results.forEach((r: any) => {
+          try {
+            r._distance = haversine(lat1, lon1, parseFloat(r.lat), parseFloat(r.lon));
+          } catch {
+            r._distance = Number.POSITIVE_INFINITY;
+          }
+        });
+
+        results.sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0));
+      }
+
+      return results;
     } catch (error) {
       return [];
     }

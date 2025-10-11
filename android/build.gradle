@@ -8,6 +8,11 @@ buildscript {
         targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
 
+    // Ensure third-party modules (eg. now-playing) compile with a recent SDK
+    NowPlaying_compileSdkVersion = Integer.parseInt(findProperty('android.NowPlaying_compileSdkVersion') ?: '33')
+    NowPlaying_targetSdkVersion = Integer.parseInt(findProperty('android.NowPlaying_targetSdkVersion') ?: '33')
+    NowPlaying_minSdkVersion = Integer.parseInt(findProperty('android.NowPlaying_minSdkVersion') ?: '21')
+
         ndkVersion = "26.1.10909125"
     }
     repositories {

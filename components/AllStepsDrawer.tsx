@@ -1,18 +1,15 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Animated,
-  Dimensions,
-  PanResponder,
-  ScrollView,
   FlatList,
 } from "react-native";
 import { MaterialIcons as Icon } from '@expo/vector-icons';
 import { NavigationStep } from '../types/RouteTypes';
 import { NavigationInstructionService } from '../services/NavigationInstructionService';
+import Drawer from './ui/Drawer';
 
 interface AllStepsDrawerProps {
   visible: boolean;
@@ -28,9 +25,6 @@ interface AllStepsDrawerProps {
   currentStepDistance?: number;
 }
 
-const { height: screenHeight } = Dimensions.get('window');
-const DRAWER_HEIGHT = screenHeight * 0.75;
-
 export default function AllStepsDrawer({
   visible,
   steps,
@@ -44,48 +38,6 @@ export default function AllStepsDrawer({
   distanceToNextStep = 0,
   currentStepDistance = 0,
 }: AllStepsDrawerProps) {
-  const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: screenHeight - DRAWER_HEIGHT,
-        useNativeDriver: true,
-        bounciness: 0,
-      }).start();
-    } else {
-      Animated.spring(translateY, {
-        toValue: screenHeight,
-        useNativeDriver: true,
-        bounciness: 0,
-      }).start();
-    }
-  }, [visible]);
-
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      const newValue = screenHeight - DRAWER_HEIGHT + gestureState.dy;
-      if (newValue >= screenHeight - DRAWER_HEIGHT && newValue <= screenHeight) {
-        translateY.setValue(newValue);
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      const threshold = DRAWER_HEIGHT / 3;
-      if (gestureState.dy > threshold) {
-        onClose();
-      } else {
-        Animated.spring(translateY, {
-          toValue: screenHeight - DRAWER_HEIGHT,
-          useNativeDriver: true,
-          bounciness: 0,
-        }).start();
-      }
-    },
-  });
-
   const formatDistance = (meters: number): string => {
     if (meters < 1000) {
       return `${Math.round(meters)}m`;
@@ -243,27 +195,15 @@ export default function AllStepsDrawer({
     );
   };
 
-  if (!visible) return null;
-
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY }],
-        },
-      ]}
-      {...panResponder.panHandlers}
+    <Drawer
+      id="all-steps-drawer"
+      visible={visible}
+      title="Itinéraire complet"
+      onClose={onClose}
+      icon={<Icon name="list" size={24} color="#007AFF" />}
     >
-      <View style={styles.header}>
-        <View style={styles.handle} />
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Icon name="close" size={24} color="#666" />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.summaryContainer}>
-        <Text style={styles.summaryTitle}>Itinéraire complet</Text>
         <View style={styles.summaryStats}>
           <View style={styles.summaryStatItem}>
             <Text style={styles.summaryStatValue}>{formatDistance(totalDistance)}</Text>
@@ -297,57 +237,16 @@ export default function AllStepsDrawer({
           index,
         })}
       />
-    </Animated.View>
+    </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: DRAWER_HEIGHT,
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 12,
+  summaryContainer: {
+    padding: 16,
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#C7C7CC',
-    borderRadius: 2,
-  },
-  closeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 8,
-    padding: 4,
-  },
-  summaryContainer: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
   },
   summaryStats: {
     flexDirection: 'row',
@@ -369,32 +268,20 @@ const styles = StyleSheet.create({
   },
   stepsList: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   stepItem: {
     flexDirection: 'row',
     paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'flex-start',
-    borderLeftWidth: 4,
-    borderLeftColor: '#E0E0E0',
-    paddingLeft: 16,
-    marginLeft: 4,
   },
   currentStepItem: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    alignItems: 'flex-start',
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-    paddingLeft: 16,
-    marginLeft: 4,
+    backgroundColor: '#F0F8FF',
   },
   completedStepItem: {
     opacity: 0.7,
-    borderLeftColor: '#34C759',
   },
   futureStepItem: {
-    borderLeftColor: '#E0E0E0',
     opacity: 0.8,
   },
   stepIconContainer: {
