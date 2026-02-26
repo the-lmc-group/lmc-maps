@@ -56,7 +56,8 @@ function MapProviderContent({
 
   const isFullScreen =
     height !== null && Math.abs((height || 0) - windowHeight) < 8;
-  const initialZoom = isFullScreen ? 2 : 3;
+  const initialZoom = isFullScreen ? 3 : 3;
+  const defaultCenterZoom = 17;
 
   const post = (obj: any) => {
     try {
@@ -66,13 +67,19 @@ function MapProviderContent({
 
   const { position } = usePosition();
 
-  const [followUser, setFollowUser] = useState(false);
+  const [followUser, setFollowUser] = useState(true);
   const ignoreMapMove = useRef(false);
   const followRef = useRef(followUser);
 
   const [mapReady, setMapReady] = useState(false);
   const pendingPositionRef = useRef<typeof position | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
+
+  const currentZoomRef = useRef(17);
+
+  useEffect(() => {
+    if (currentZoom !== null) currentZoomRef.current = currentZoom;
+  }, [currentZoom]);
 
   useEffect(() => {
     followRef.current = followUser;
@@ -102,66 +109,53 @@ function MapProviderContent({
         post({ type: "setUserMarker", lat, lng }),
       followUser,
       toggleFollow: () => {
-        setFollowUser((f) => {
-          const next = !f;
-          if (!next) {
-            post({
-              type: "panTo",
-              lat: 0,
-              lng: 0,
-              animate: true,
-              duration: 0.6,
-            });
-          }
-          return next;
-        });
+        setFollowUser((f) => !f);
       },
       centerAndFollow: () => {
+        setFollowUser(true);
+
         if (position) {
           ignoreMapMove.current = true;
           setTimeout(() => {
             ignoreMapMove.current = false;
           }, 1000);
-          const maxZ = layers.mapType === "terrain" ? 16 : 19;
-          const targetZoom = Math.min(maxZ, 17);
-
           post({
-            type: "zoomTo",
+            type: "setUserMarker",
             lat: position.latitude,
             lng: position.longitude,
-            zoom: targetZoom,
-            animate: true,
-            duration: 0.6,
+            center: true,
+            offsetY: -40,
+            zoom: defaultCenterZoom,
+            animate: false,
           });
-          setFollowUser(true);
         }
       },
     };
   }, [followUser, position, layers.mapType, currentZoom]);
 
-  const handleMapMsg = React.useCallback(
-    (msg: any) => {
-      if (!msg) return;
-      if (msg.type === "mapReady") {
-        setMapReady(true);
-        return;
+  const handleMapMsg = React.useCallback((msg: any) => {
+    if (!msg) return;
+    if (msg.type === "mapReady") {
+      setMapReady(true);
+      return;
+    }
+    if (msg.type === "zoomChanged") {
+      setCurrentZoom(msg.zoom);
+      return;
+    }
+
+    if (msg.type === "mapMoved") {
+      if (followRef.current) {
+        setFollowUser(false);
       }
-      if (msg.type === "zoomChanged") {
-        setCurrentZoom(msg.zoom);
-        return;
-      }
-      if (msg.type === "mapMoved") {
-        if (ignoreMapMove.current) {
-          ignoreMapMove.current = false;
-          return;
-        }
-        if (followUser) {
-          setFollowUser(false);
-        }
-      }
-    },
-    [followUser],
-  );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const theme = layers.darkTheme ? "dark" : "light";
+    post({ type: "setBaseLayer", layer: layers.mapType, theme });
+  }, [mapReady, layers.mapType, layers.darkTheme]);
 
   useEffect(() => {
     if (!showUserLocation) {
@@ -169,83 +163,35 @@ function MapProviderContent({
       setFollowUser(false);
       return;
     }
-    if (!position) return;
+
     if (!mapReady) {
-      pendingPositionRef.current = position;
+      if (position) {
+        pendingPositionRef.current = position;
+      }
       return;
     }
 
+    const pos = position || pendingPositionRef.current;
+
+    if (!pos) return;
+
     pendingPositionRef.current = null;
-    ignoreMapMove.current = true;
-    setTimeout(() => {
-      ignoreMapMove.current = false;
-    }, 1000);
-    post({
-      type: "setUserMarker",
-      lat: position.latitude,
-      lng: position.longitude,
-      center: true,
-      offsetY: 120,
-      animate: true,
-      duration: 0.6,
-    });
 
-    setFollowUser(true);
-    post({
-      type: "zoomTo",
-      lat: position.latitude,
-      lng: position.longitude,
-      zoom: 17,
-      animate: true,
-      duration: 0.6,
-    });
-  }, [position, initialZoom, mapReady, showUserLocation]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    if (!showUserLocation) {
-      post({ type: "clearUserMarker" });
-      return;
+    if (followUser) {
+      post({
+        type: "setUserMarker",
+        lat: pos.latitude,
+        lng: pos.longitude,
+        center: true,
+        offsetY: -40,
+        zoom: defaultCenterZoom,
+        animate: false,
+      });
+    } else {
+      post({ type: "setUserMarker", lat: pos.latitude, lng: pos.longitude });
     }
-    const p = pendingPositionRef.current;
-    if (!p) return;
-    pendingPositionRef.current = null;
-    ignoreMapMove.current = true;
-    setTimeout(() => {
-      ignoreMapMove.current = false;
-    }, 1000);
-    post({
-      type: "setUserMarker",
-      lat: p.latitude,
-      lng: p.longitude,
-      center: true,
-      offsetY: 120,
-      animate: true,
-      duration: 0.6,
-    });
-    setFollowUser(true);
-    post({
-      type: "zoomTo",
-      lat: p.latitude,
-      lng: p.longitude,
-      zoom: 17,
-      animate: true,
-      duration: 0.6,
-    });
-  }, [mapReady, showUserLocation]);
+  }, [position, mapReady, showUserLocation, followUser]);
 
-  useEffect(() => {
-    if (!mapReady) return;
-    const theme = layers.darkTheme ? "dark" : "light";
-    const maxZ = layers.mapType === "terrain" ? 17 : 19;
-
-    if (currentZoom !== null && currentZoom > maxZ) {
-      post({ type: "setZoom", zoom: maxZ, animate: false });
-      setCurrentZoom(maxZ);
-    }
-
-    post({ type: "setBaseLayer", layer: layers.mapType, theme });
-  }, [layers.mapType, layers.darkTheme, mapReady, currentZoom]);
   return (
     <MapCtx.Provider value={controls}>
       <View style={[styles.container, style]} onLayout={onLayout}>

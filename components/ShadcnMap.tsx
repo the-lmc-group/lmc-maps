@@ -52,14 +52,12 @@ const ShadcnMap = React.forwardRef<any, Props>(
         try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'zoomChanged', zoom: map.getZoom() })); } catch(e) {}
       });
 
-      function sendMove(){
-        window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapMoved'}));
+      function sendMove(e){
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'mapMoved', cause: e.type }));
       }
 
-      map.on('movestart', sendMove);
-      map.on('dragstart', sendMove);
+      map.on('dragstart', sendMove);       
       map.on('zoomend', function(){ try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'zoomChanged', zoom: map.getZoom() })); } catch(e) {} });
-
       var userMarker = null;
 
       function handleMessage(msg) {
