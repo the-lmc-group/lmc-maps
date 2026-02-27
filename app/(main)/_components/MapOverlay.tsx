@@ -1,14 +1,15 @@
 import { useHapticSettings } from "@/contexts/HapticSettingsContext";
+import { useUser } from "@/contexts/UserContext";
 import { createTranslator } from "@/i18n";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 
@@ -19,6 +20,7 @@ interface MapOverlayProps {
 export default function MapOverlay({ blockMap }: MapOverlayProps) {
   const { t } = createTranslator("main");
   const { vibration } = useHapticSettings();
+  const { saved } = useUser();
   const router = useRouter();
 
   const impactStyle = React.useMemo(() => {
@@ -39,13 +41,33 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
   const handleChipPress = React.useCallback(
     (id?: string) => {
       triggerHaptic();
-      if (id === "recent") {
+      if (id === "home" && saved.home) {
+        router.push({
+          pathname: "/(main)/place",
+          params: {
+            name: saved.home.name ?? "",
+            address: saved.home.address,
+            lat: String(saved.home.lat),
+            lng: String(saved.home.lng),
+          },
+        });
+      } else if (id === "work" && saved.work) {
+        router.push({
+          pathname: "/(main)/place",
+          params: {
+            name: saved.work.name ?? "",
+            address: saved.work.address,
+            lat: String(saved.work.lat),
+            lng: String(saved.work.lng),
+          },
+        });
+      } else if (id === "recent") {
         router.push("/(main)/search?mode=search");
       } else if (id === "more") {
         router.push("/(main)/search?mode=saved");
       }
     },
-    [triggerHaptic, router],
+    [triggerHaptic, router, saved],
   );
 
   const handleAvatarPress = React.useCallback(() => {
@@ -123,45 +145,49 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
             nestedScrollEnabled={true}
             directionalLockEnabled={true}
           >
-            <TouchableOpacity
-              style={styles.chip}
-              onPress={() => handleChipPress("home")}
-            >
-              <Svg width={20} height={20} viewBox="0 -960 960 960">
-                <Path
-                  d="M240-200h120v-200q0-17 11.5-28.5T400-440h160q17 0 28.5 11.5T600-400v200h120v-360L480-740 240-560v360Zm-80 0v-360q0-19 8.5-36t23.5-28l240-180q21-16 48-16t48 16l240 180q15-11 23.5 28t8.5 36v360q0 33-23.5 56.5T720-120H560q-17 0-28.5-11.5T520-160v-200h-80v200q0 17-11.5 28.5T400-120H240q-33 0-56.5-23.5T160-200Zm320-270Z"
-                  fill="#fff"
-                />
-              </Svg>
-
-              <Text
-                style={styles.chipText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
+            {saved.home && (
+              <TouchableOpacity
+                style={styles.chip}
+                onPress={() => handleChipPress("home")}
               >
-                {t("chips.home")}
-              </Text>
-            </TouchableOpacity>
+                <Svg width={20} height={20} viewBox="0 -960 960 960">
+                  <Path
+                    d="M240-200h120v-200q0-17 11.5-28.5T400-440h160q17 0 28.5 11.5T600-400v200h120v-360L480-740 240-560v360Zm-80 0v-360q0-19 8.5-36t23.5-28l240-180q21-16 48-16t48 16l240 180q15-11 23.5 28t8.5 36v360q0 33-23.5 56.5T720-120H560q-17 0-28.5-11.5T520-160v-200h-80v200q0 17-11.5 28.5T400-120H240q-33 0-56.5-23.5T160-200Zm320-270Z"
+                    fill="#fff"
+                  />
+                </Svg>
 
-            <TouchableOpacity
-              style={styles.chip}
-              onPress={() => handleChipPress("work")}
-            >
-              <Svg width={20} height={20} viewBox="0 -960 960 960">
-                <Path
-                  d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z"
-                  fill="#fff"
-                />
-              </Svg>
+                <Text
+                  style={styles.chipText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {t("chips.home")}
+                </Text>
+              </TouchableOpacity>
+            )}
 
-              <Text
-                style={styles.chipText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
+            {saved.work && (
+              <TouchableOpacity
+                style={styles.chip}
+                onPress={() => handleChipPress("work")}
               >
-                {t("chips.work")}
-              </Text>
-            </TouchableOpacity>
+                <Svg width={20} height={20} viewBox="0 -960 960 960">
+                  <Path
+                    d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z"
+                    fill="#fff"
+                  />
+                </Svg>
+
+                <Text
+                  style={styles.chipText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {t("chips.work")}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.chip}

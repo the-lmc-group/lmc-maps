@@ -1,3 +1,4 @@
+import { SavePlaceModal } from "@/app/(main)/_components/SavePlaceModal";
 import { Colors } from "@/constants/theme";
 import { usePosition } from "@/contexts/PositionContext";
 import { useUser } from "@/contexts/UserContext";
@@ -5,18 +6,14 @@ import { createTranslator } from "@/i18n";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
-  ImageBackground,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ImageBackground,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import Svg, { Path } from "react-native-svg";
@@ -32,8 +29,8 @@ import shoppingImg from "../../assets/images/search/explore/shopping.png";
 import socialImg from "../../assets/images/search/explore/social.png";
 import topDiningImg from "../../assets/images/search/explore/topDining.png";
 import {
-  PhotonFeature,
-  SearchEngineService,
+    PhotonFeature,
+    SearchEngineService,
 } from "../../services/SearchEngineService";
 
 const GasIcon = () => (
@@ -175,27 +172,32 @@ const SearchResult: React.FC<{
   title: string;
   subtitle?: string;
   onPress?: () => void;
-}> = ({ icon, title, subtitle, onPress }) => (
+  onArrowPress?: () => void;
+}> = ({ icon, title, subtitle, onPress, onArrowPress }) => (
   <TouchableOpacity style={styles.listItem} onPress={onPress}>
     <View style={styles.itemIcon}>{icon}</View>
     <View style={styles.itemBody}>
       <Text style={styles.itemTitle}>{title}</Text>
       {subtitle ? <Text style={styles.itemSub}>{subtitle}</Text> : null}
     </View>
-    <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-      <Path d="M680-624 244-188q-11 11-28 11t-28-11q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360-720q0-17 11.5-28.5T400-760h320q17 0 28.5 11.5T760-720v320q0 17-11.5 28.5T720-360q-17 0-28.5-11.5T680-400v-224Z" />
-    </Svg>
+    {onArrowPress ? (
+      <TouchableOpacity onPress={onArrowPress} hitSlop={8}>
+        <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
+          <Path d="M680-624 244-188q-11 11-28 11t-28-11q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360-720q0-17 11.5-28.5T400-760h320q17 0 28.5 11.5T760-720v320q0 17-11.5 28.5T720-360q-17 0-28.5-11.5T680-400v-224Z" />
+        </Svg>
+      </TouchableOpacity>
+    ) : null}
   </TouchableOpacity>
 );
 
 export default function SearchScreen() {
   const { t } = createTranslator("search");
   const router = useRouter();
-  const { searchParams } = useLocalSearchParams();
+  const { mode: modeParam } = useLocalSearchParams();
   const initialMode =
-    searchParams === "explore"
+    modeParam === "explore"
       ? "explore"
-      : searchParams === "saved"
+      : modeParam === "saved"
         ? "saved"
         : "search";
   const [mode, setMode] = React.useState<"search" | "explore" | "saved">(
@@ -207,94 +209,23 @@ export default function SearchScreen() {
   React.useEffect(() => {
     initialMount.current = false;
   }, []);
-  const { saved, setSavedPlace, addOtherPlace, removeOtherPlace } = useUser();
+  const { saved } = useUser();
   const { position } = usePosition();
   const lastAddressQueryRef = React.useRef<string | null>(null);
-  const lastModalAddrQueryRef = React.useRef<string | null>(null);
 
   const [modalVisible, setModalVisible] = React.useState(false);
   const [modalSlot, setModalSlot] = React.useState<"home" | "work" | "other">(
     "home",
   );
-  const [modalPlaceName, setModalPlaceName] = React.useState("");
-  const [modalSelectedIcon, setModalSelectedIcon] = React.useState("heart");
-  const [addrText, setAddrText] = React.useState("");
-  const [addrLat, setAddrLat] = React.useState("");
-  const [addrLng, setAddrLng] = React.useState("");
-  const [modalAddrResults, setModalAddrResults] = React.useState<
-    PhotonFeature[]
-  >([]);
   const [modalEditingIndex, setModalEditingIndex] = React.useState<
     number | null
   >(null);
-  const isEditing =
-    modalVisible &&
-    ((modalSlot === "home" && !!saved.home) ||
-      (modalSlot === "work" && !!saved.work) ||
-      (modalSlot === "other" && modalEditingIndex !== null));
-
-  const handleSavePlace = () => {
-    if (!addrText || !addrLat || !addrLng) return;
-    const place = {
-      address: addrText,
-      lat: parseFloat(addrLat),
-      lng: parseFloat(addrLng),
-      name:
-        modalSlot === "other"
-          ? modalPlaceName
-          : modalSlot === "home"
-            ? "Home"
-            : "Work",
-      icon: modalSlot === "other" ? modalSelectedIcon : modalSlot,
-    };
-
-    if (modalSlot === "home" || modalSlot === "work") {
-      setSavedPlace(modalSlot, place);
-    } else {
-      if (modalEditingIndex !== null) {
-        removeOtherPlace(modalEditingIndex);
-        addOtherPlace(place);
-      } else {
-        addOtherPlace(place);
-      }
-    }
-    setModalVisible(false);
-    setModalEditingIndex(null);
-  };
-
-  const handleDeletePlace = () => {
-    if (modalSlot === "home" || modalSlot === "work") {
-      setSavedPlace(modalSlot, null);
-    } else if (modalSlot === "other" && modalEditingIndex !== null) {
-      removeOtherPlace(modalEditingIndex);
-    }
-    setModalVisible(false);
-    setModalEditingIndex(null);
-  };
-  React.useEffect(() => {
-    const q = addrText.trim();
-    if (!modalVisible || !q || (addrLat && addrLng)) {
-      setModalAddrResults([]);
-      return;
-    }
-
-    if (lastModalAddrQueryRef.current === q) return;
-
-    const t = setTimeout(async () => {
-      try {
-        const results = await SearchEngineService.photonSearch(q, {
-          limit: 5,
-          lat: position?.latitude,
-          lon: position?.longitude,
-        });
-        lastModalAddrQueryRef.current = q;
-        setModalAddrResults(results);
-      } catch {
-        setModalAddrResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [addrText, modalVisible, addrLat, addrLng]);
+  const [modalInitialData, setModalInitialData] = React.useState<{
+    name: string;
+    address: string;
+    lat: string;
+    lng: string;
+  }>({ name: "", address: "", lat: "", lng: "" });
 
   const filteredAmenities = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -454,6 +385,13 @@ export default function SearchScreen() {
 
                     const noStreet =
                       !r.properties?.housenumber && !r.properties?.street;
+                    const streetInfo = [
+                      r.properties?.housenumber,
+                      r.properties?.street,
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
                     const title =
                       (isStation ||
                         isFoodPlace ||
@@ -465,12 +403,13 @@ export default function SearchScreen() {
                         ? r.properties.name
                         : noStreet
                           ? r.properties?.city
-                          : [r.properties?.housenumber, r.properties?.street]
-                              .filter(Boolean)
-                              .join(" ");
+                          : streetInfo;
+
                     const subtitle = noStreet
                       ? r.properties?.country
-                      : r.properties?.city + ", " + r.properties?.country;
+                      : [streetInfo, r.properties?.city]
+                          .filter(Boolean)
+                          .join(", ");
 
                     const PlaceIcon = noStreet ? (
                       <Svg
@@ -505,7 +444,31 @@ export default function SearchScreen() {
                         icon={PlaceIcon}
                         title={title || t("unknown_place")}
                         subtitle={subtitle}
-                        onPress={() => setQuery(title || "")}
+                        onPress={() => {
+                          router.push({
+                            pathname: "/(main)/place",
+                            params: {
+                              osm_id: r.properties?.osm_id,
+                              osm_type: r.properties?.osm_type,
+                              osm_value: r.properties?.osm_value,
+                              address: subtitle,
+                              name: title,
+                              lat: r.geometry?.coordinates[1]?.toString(),
+                              lng: r.geometry?.coordinates[0]?.toString(),
+                            },
+                          });
+                        }}
+                        onArrowPress={() => {
+                          router.push({
+                            pathname: "/(main)/routePlanning",
+                            params: {
+                              name: title,
+                              address: subtitle,
+                              lat: r.geometry?.coordinates[1]?.toString(),
+                              lng: r.geometry?.coordinates[0]?.toString(),
+                            },
+                          });
+                        }}
                       />
                     );
                   })}
@@ -726,13 +689,27 @@ export default function SearchScreen() {
                 <TouchableOpacity
                   style={styles.favCard}
                   onPress={() => {
-                    setModalSlot("home");
-                    setModalPlaceName("Home");
-                    setAddrText(saved?.home?.address ?? "");
-                    setAddrLat(saved?.home?.lat?.toString() ?? "");
-                    setAddrLng(saved?.home?.lng?.toString() ?? "");
-                    setModalEditingIndex(null);
-                    setModalVisible(true);
+                    if (saved.home) {
+                      router.push({
+                        pathname: "/(main)/place",
+                        params: {
+                          name: "Home",
+                          address: saved.home.address,
+                          lat: saved.home.lat?.toString(),
+                          lng: saved.home.lng?.toString(),
+                        },
+                      });
+                    } else {
+                      setModalSlot("home");
+                      setModalEditingIndex(null);
+                      setModalInitialData({
+                        name: "Home",
+                        address: "",
+                        lat: "",
+                        lng: "",
+                      });
+                      setModalVisible(true);
+                    }
                   }}
                 >
                   <View style={styles.favCardHeader}>
@@ -762,10 +739,13 @@ export default function SearchScreen() {
                       style={styles.favAddButton}
                       onPress={() => {
                         setModalSlot("home");
-                        setModalPlaceName("Home");
-                        setAddrText(saved?.home?.address ?? "");
-                        setAddrLat(saved?.home?.lat?.toString() ?? "");
-                        setAddrLng(saved?.home?.lng?.toString() ?? "");
+                        setModalEditingIndex(null);
+                        setModalInitialData({
+                          name: "Home",
+                          address: saved?.home?.address ?? "",
+                          lat: saved?.home?.lat?.toString() ?? "",
+                          lng: saved?.home?.lng?.toString() ?? "",
+                        });
                         setModalVisible(true);
                       }}
                     >
@@ -783,13 +763,27 @@ export default function SearchScreen() {
                 <TouchableOpacity
                   style={styles.favCard}
                   onPress={() => {
-                    setModalSlot("work");
-                    setModalPlaceName("Work");
-                    setAddrText(saved?.work?.address ?? "");
-                    setAddrLat(saved?.work?.lat?.toString() ?? "");
-                    setAddrLng(saved?.work?.lng?.toString() ?? "");
-                    setModalEditingIndex(null);
-                    setModalVisible(true);
+                    if (saved.work) {
+                      router.push({
+                        pathname: "/(main)/place",
+                        params: {
+                          name: "Work",
+                          address: saved.work.address,
+                          lat: saved.work.lat?.toString(),
+                          lng: saved.work.lng?.toString(),
+                        },
+                      });
+                    } else {
+                      setModalSlot("work");
+                      setModalEditingIndex(null);
+                      setModalInitialData({
+                        name: "Work",
+                        address: "",
+                        lat: "",
+                        lng: "",
+                      });
+                      setModalVisible(true);
+                    }
                   }}
                 >
                   <View style={styles.favCardHeader}>
@@ -819,10 +813,13 @@ export default function SearchScreen() {
                       style={styles.favAddButton}
                       onPress={() => {
                         setModalSlot("work");
-                        setModalPlaceName("Work");
-                        setAddrText(saved?.work?.address ?? "");
-                        setAddrLat(saved?.work?.lat?.toString() ?? "");
-                        setAddrLng(saved?.work?.lng?.toString() ?? "");
+                        setModalEditingIndex(null);
+                        setModalInitialData({
+                          name: "Work",
+                          address: saved?.work?.address ?? "",
+                          lat: saved?.work?.lat?.toString() ?? "",
+                          lng: saved?.work?.lng?.toString() ?? "",
+                        });
                         setModalVisible(true);
                       }}
                     >
@@ -846,14 +843,15 @@ export default function SearchScreen() {
                       key={idx}
                       style={styles.favCard}
                       onPress={() => {
-                        setModalSlot("other");
-                        setModalEditingIndex(idx);
-                        setModalPlaceName(place.name || "");
-                        setModalSelectedIcon(place.icon || "heart");
-                        setAddrText(place.address);
-                        setAddrLat(place.lat?.toString() || "");
-                        setAddrLng(place.lng?.toString() || "");
-                        setModalVisible(true);
+                        router.push({
+                          pathname: "/(main)/place",
+                          params: {
+                            name: place.name || "",
+                            address: place.address,
+                            lat: place.lat?.toString() || "",
+                            lng: place.lng?.toString() || "",
+                          },
+                        });
                       }}
                     >
                       <View style={styles.favCardHeader}>
@@ -883,11 +881,12 @@ export default function SearchScreen() {
                           onPress={() => {
                             setModalSlot("other");
                             setModalEditingIndex(idx);
-                            setModalPlaceName(place.name || "");
-                            setModalSelectedIcon(place.icon || "heart");
-                            setAddrText(place.address);
-                            setAddrLat(place.lat?.toString() || "");
-                            setAddrLng(place.lng?.toString() || "");
+                            setModalInitialData({
+                              name: place.name || "",
+                              address: place.address,
+                              lat: place.lat?.toString() || "",
+                              lng: place.lng?.toString() || "",
+                            });
                             setModalVisible(true);
                           }}
                         >
@@ -907,11 +906,13 @@ export default function SearchScreen() {
                   style={styles.favAddPlaceButton}
                   onPress={() => {
                     setModalSlot("other");
-                    setModalPlaceName("");
-                    setModalSelectedIcon("heart");
-                    setAddrText("");
-                    setAddrLat("");
-                    setAddrLng("");
+                    setModalEditingIndex(null);
+                    setModalInitialData({
+                      name: "",
+                      address: "",
+                      lat: "",
+                      lng: "",
+                    });
                     setModalVisible(true);
                   }}
                 >
@@ -996,152 +997,19 @@ export default function SearchScreen() {
         </View>
       )}
 
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <SavePlaceModal
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 80}
-                style={styles.modalContent}
-              >
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>
-                    {modalSlot === "home"
-                      ? t("modal_set_home")
-                      : modalSlot === "work"
-                        ? t("modal_set_work")
-                        : t("modal_add_place")}
-                  </Text>
-                  {isEditing && (
-                    <TouchableOpacity onPress={handleDeletePlace}>
-                      <Svg
-                        width={24}
-                        height={24}
-                        viewBox="0 -960 960 960"
-                        fill="#f55"
-                      >
-                        <Path d="M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z" />
-                      </Svg>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <View style={styles.iconNameContainer}>
-                  {modalSlot === "other" && (
-                    <View style={styles.selectedIconCircle}>
-                      {React.createElement(
-                        PlaceIcons.find((i) => i.id === modalSelectedIcon)
-                          ?.icon || StarIcon,
-                        { color: Colors.dark.primary },
-                      )}
-                    </View>
-                  )}
-                  <TextInput
-                    placeholder={t("modal_name_placeholder")}
-                    placeholderTextColor="#90adcb"
-                    style={styles.modalInputName}
-                    value={modalPlaceName}
-                    onChangeText={setModalPlaceName}
-                  />
-                </View>
-
-                {modalSlot === "other" && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.iconPickerScroll}
-                    contentContainerStyle={{ paddingHorizontal: 16 }}
-                  >
-                    {PlaceIcons.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => setModalSelectedIcon(item.id)}
-                        style={[
-                          styles.iconOption,
-                          modalSelectedIcon === item.id &&
-                            styles.iconOptionSelected,
-                        ]}
-                      >
-                        <item.icon
-                          color={
-                            modalSelectedIcon === item.id ? "#fff" : "#90adcb"
-                          }
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-
-                <View style={styles.modalSearchBox}>
-                  <TextInput
-                    placeholder={t("modal_addr_placeholder")}
-                    placeholderTextColor="#90adcb"
-                    style={styles.modalInputAddr}
-                    value={addrText}
-                    onChangeText={(txt) => {
-                      setAddrText(txt);
-                      setAddrLat("");
-                      setAddrLng("");
-                    }}
-                  />
-                </View>
-
-                <ScrollView style={{ maxHeight: 200 }}>
-                  {modalAddrResults.map((r, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.modalAddrResult}
-                      onPress={() => {
-                        const title =
-                          r.properties.name ||
-                          [r.properties.housenumber, r.properties.street]
-                            .filter(Boolean)
-                            .join(" ") ||
-                          r.properties.city ||
-                          "";
-                        setAddrText(title);
-                        setAddrLat(r.geometry.coordinates[1].toString());
-                        setAddrLng(r.geometry.coordinates[0].toString());
-                        setModalAddrResults([]);
-                      }}
-                    >
-                      <Text style={{ color: "#fff", fontWeight: "600" }}>
-                        {r.properties.name ||
-                          [r.properties.housenumber, r.properties.street]
-                            .filter(Boolean)
-                            .join(" ") ||
-                          r.properties.city}
-                      </Text>
-                      <Text style={{ color: "#90adcb", fontSize: 12 }}>
-                        {r.properties.city}, {r.properties.country}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                <TouchableOpacity
-                  style={[
-                    styles.modalSaveButton,
-                    (!addrLat || !addrLng) && { opacity: 0.5 },
-                  ]}
-                  onPress={handleSavePlace}
-                  disabled={!addrLat || !addrLng}
-                >
-                  <Text style={styles.modalSaveButtonText}>
-                    {t("modal_save")}
-                  </Text>
-                </TouchableOpacity>
-              </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        onClose={() => {
+          setModalVisible(false);
+          setModalEditingIndex(null);
+        }}
+        slot={modalSlot}
+        editingIndex={modalEditingIndex}
+        initialName={modalInitialData.name}
+        initialAddress={modalInitialData.address}
+        initialLat={modalInitialData.lat}
+        initialLng={modalInitialData.lng}
+      />
     </View>
   );
 }
@@ -1351,111 +1219,4 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   scrollContent: { paddingBottom: 64 },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#101922",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    minHeight: "50%",
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  iconNameContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-    backgroundColor: "#12202a",
-    marginHorizontal: 16,
-    borderRadius: 16,
-    height: 72,
-  },
-  selectedIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(13,127,242,0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  modalInputName: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  iconPickerScroll: {
-    marginBottom: 24,
-  },
-  iconOption: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#12202a",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  iconOptionSelected: {
-    backgroundColor: Colors.dark.primary,
-  },
-  modalDeleteButton: {
-    marginLeft: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#422",
-    borderRadius: 8,
-  },
-  modalSearchBox: {
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: "#12202a",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  modalInputAddr: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 16,
-  },
-  modalAddrResult: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
-    marginHorizontal: 16,
-  },
-  modalSaveButton: {
-    backgroundColor: Colors.dark.primary,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-    marginTop: 24,
-  },
-  modalSaveButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
 });

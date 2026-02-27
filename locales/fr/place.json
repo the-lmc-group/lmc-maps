@@ -1,0 +1,22 @@
+{
+  "title": "Détails du lieu",
+  "unknownPlace": "Lieu inconnu",
+  "placeNotFound": "Lieu non trouvé",
+  "goBack": "Retour",
+  "directions": "Itinéraire",
+  "address": "Adresse",
+  "hours": "Horaires",
+  "currentSchedule": "Horaires actuels",
+  "openNow": "Ouvert maintenant",
+  "startNavigation": "Démarrer la navigation",
+  "categories": {
+    "restaurant": "Restaurant & Lounge",
+    "cafe": "Café & Vie nocturne",
+    "gasStation": "Station-service",
+    "parking": "Parking",
+    "health": "Santé & Bien-être",
+    "commerce": "Commerce & Boutique",
+    "publicTransport": "Transport public",
+    "location": "Lieu"
+  }
+}

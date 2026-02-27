@@ -9,16 +9,19 @@ interface Props {
   zoom?: number;
 }
 
-export default function MapSnapshot({ lat, lng, zoom = 11 }: Props) {
+function MapSnapshotInner({ lat, lng, zoom = 11 }: Props) {
   const ref = useRef<any>(null);
   const [mapReady, setMapReady] = React.useState(false);
   const ctx = React.useContext(MapLayersContext);
-  const layers =
-    ctx ??
-    ({
-      mapType: "standard",
-      darkTheme: false,
-    } as any);
+  const layers = React.useMemo(
+    () =>
+      ctx ??
+      ({
+        mapType: "standard",
+        darkTheme: false,
+      } as any),
+    [ctx],
+  );
 
   const post = (obj: any) => {
     try {
@@ -45,6 +48,9 @@ export default function MapSnapshot({ lat, lng, zoom = 11 }: Props) {
     </View>
   );
 }
+
+const MapSnapshot = React.memo(MapSnapshotInner);
+export default MapSnapshot;
 
 const styles = StyleSheet.create({
   container: {

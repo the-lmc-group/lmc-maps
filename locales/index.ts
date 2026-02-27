@@ -6,6 +6,8 @@ const fr_search = require("./fr/search.json");
 const en_search = require("./en/search.json");
 const fr_profile = require("./fr/profile.json");
 const en_profile = require("./en/profile.json");
+const fr_place = require("./fr/place.json");
+const en_place = require("./en/place.json");
 
 const translations = {
   fr: {
@@ -13,12 +15,14 @@ const translations = {
     main: fr_main,
     search: fr_search,
     profile: fr_profile,
+    place: fr_place,
   },
   en: {
     onboarding: en_onboarding,
     main: en_main,
     search: en_search,
     profile: en_profile,
+    place: en_place,
   },
 };
 

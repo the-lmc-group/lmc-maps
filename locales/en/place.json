@@ -1,0 +1,22 @@
+{
+  "title": "Location Details",
+  "unknownPlace": "Unknown Place",
+  "placeNotFound": "Place not found",
+  "goBack": "Go Back",
+  "directions": "Directions",
+  "address": "Address",
+  "hours": "Hours",
+  "currentSchedule": "Current Schedule",
+  "openNow": "Open Now",
+  "startNavigation": "Start Navigation",
+  "categories": {
+    "restaurant": "Restaurant & Lounge",
+    "cafe": "Cafe & Nightlife",
+    "gasStation": "Gas Station",
+    "parking": "Parking Lot",
+    "health": "Health & Wellness",
+    "commerce": "Commerce & Trade",
+    "publicTransport": "Public Transport",
+    "location": "Location"
+  }
+}
