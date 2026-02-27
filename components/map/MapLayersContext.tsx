@@ -24,9 +24,8 @@ interface MapLayersContextValue {
   setDarkTheme: (dark: boolean) => void;
 }
 
-const MapLayersContext = React.createContext<MapLayersContextValue | null>(
-  null,
-);
+export const MapLayersContext =
+  React.createContext<MapLayersContextValue | null>(null);
 
 export function useMapLayers() {
   const ctx = React.useContext(MapLayersContext);

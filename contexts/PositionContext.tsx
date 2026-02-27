@@ -119,6 +119,7 @@ export function PositionProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (subscriberRef.current) return;
+
       subscriberRef.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Highest,

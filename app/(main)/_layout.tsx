@@ -1,4 +1,3 @@
-import MapProvider from "@/components/map";
 import { PositionProvider } from "@/contexts/PositionContext";
 import { Slot } from "expo-router";
 import React from "react";
@@ -10,9 +9,7 @@ export default function Layout() {
     <PermissionsProvider>
       <PositionProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <MapProvider style={{ flex: 1 }}>
-            <Slot />
-          </MapProvider>
+          <Slot />
         </GestureHandlerRootView>
       </PositionProvider>
     </PermissionsProvider>

@@ -55,10 +55,12 @@ function InnerLayout() {
     }
 
     if (hasFinishedOnboarding) {
-      if (!pathname.startsWith("/(main)")) {
+      if (pathname.startsWith("/(onboarding)")) {
         router.replace("/(main)");
         setNavigationDone(true);
       }
+
+      setNavigationDone(true);
       return;
     }
 

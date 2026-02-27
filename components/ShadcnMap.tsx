@@ -9,7 +9,7 @@ type Props = {
 
 const ShadcnMap = React.forwardRef<any, Props>(
   ({ initialZoom = 2, onMapMessage }, ref) => {
-    const html = `<!doctype html>
+    const html: string = `<!doctype html>
   <html>
   <head>
     <meta charset="utf-8" />
@@ -71,6 +71,7 @@ const ShadcnMap = React.forwardRef<any, Props>(
               map.flyTo([m.lat || 0, m.lng || 0], m.zoom, { duration: m.duration || 0.6 });
             }
           }
+          setTimeout(()=>map.invalidateSize(),100);
           if (m.type === 'setZoom') { map.setZoom(m.zoom, { animate: m.animate !== false }); }
           if (m.type === 'zoomBy') { map.setZoom(map.getZoom() + (m.delta || 0), { animate: m.animate !== false }); }
           if (m.type === 'panTo') {
@@ -81,8 +82,21 @@ const ShadcnMap = React.forwardRef<any, Props>(
           }
           if (m.type === 'setUserMarker') {
             const lat = m.lat; const lng = m.lng;
+            const iconType = m.icon || null;
+            
             if (userMarker) {
-              userMarker.setLatLng([lat, lng]);
+              map.removeLayer(userMarker);
+              userMarker = null;
+            }
+            if (iconType === 'address') {
+              const svg = '<svg width="24" height="24" viewBox="0 -960 960 960" fill="#0d7ff2"><path d="M480-186q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm-28 74q-14-5-25-15-65-60-115-117t-83.5-110.5q-33.5-53.5-51-103T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 45-17.5 94.5t-51 103Q698-301 648-244T533-127q-11 10-25 15t-28 5q-14 0-28-5Zm28-448Zm56.5 56.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5Z" /></svg>';
+              const myIcon = L.divIcon({
+                className: '',
+                html: svg,
+                iconSize: [24,24],
+                iconAnchor: [12,24]
+              });
+              userMarker = L.marker([lat, lng], { icon: myIcon }).addTo(map);
             } else {
               userMarker = L.circleMarker([lat, lng], { radius: 8, color: '#fff', fillColor: '#0d7ff2', fillOpacity: 1, weight: 2 }).addTo(map);
             }
@@ -104,7 +118,7 @@ const ShadcnMap = React.forwardRef<any, Props>(
             var theme = m.theme || 'dark';
             
             if (baseLayer) { map.removeLayer(baseLayer); }
-
+            setTimeout(()=>map.invalidateSize(),100);
             if (layer === 'standard') {
               var url = 'https://{s}.basemaps.cartocdn.com/' + theme + '_all/{z}/{x}/{y}.png';
               baseLayer = L.tileLayer(url, { maxZoom: 19, minZoom: ${initialZoom}, detectRetina: true, tileSize: 512, zoomOffset: -1 }).addTo(map);

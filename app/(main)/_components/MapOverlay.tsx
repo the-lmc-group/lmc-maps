@@ -1,15 +1,12 @@
 import { useHapticSettings } from "@/contexts/HapticSettingsContext";
-import { useUser } from "@/contexts/UserContext";
 import { createTranslator } from "@/i18n";
 import * as Haptics from "expo-haptics";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -22,15 +19,7 @@ interface MapOverlayProps {
 export default function MapOverlay({ blockMap }: MapOverlayProps) {
   const { t } = createTranslator("main");
   const { vibration } = useHapticSettings();
-  const { name, setName } = useUser();
   const router = useRouter();
-  const pathname = usePathname();
-  const lastAvatarTapRef = React.useRef<number>(0);
-  const avatarTapTimeoutRef = React.useRef<
-    ReturnType<typeof setTimeout> | undefined
-  >(undefined);
-
-  const [debugModalVisible, setDebugModalVisible] = React.useState(false);
 
   const impactStyle = React.useMemo(() => {
     const force = vibration.force ?? 1;
@@ -50,26 +39,19 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
   const handleChipPress = React.useCallback(
     (id?: string) => {
       triggerHaptic();
+      if (id === "recent") {
+        router.push("/(main)/search?mode=search");
+      } else if (id === "more") {
+        router.push("/(main)/search?mode=saved");
+      }
     },
-    [triggerHaptic],
+    [triggerHaptic, router],
   );
 
   const handleAvatarPress = React.useCallback(() => {
     triggerHaptic();
-    const now = Date.now();
-
-    if (avatarTapTimeoutRef.current) {
-      clearTimeout(avatarTapTimeoutRef.current);
-      avatarTapTimeoutRef.current = undefined;
-    }
-
-    lastAvatarTapRef.current = now;
-    setDebugModalVisible(true);
-
-    avatarTapTimeoutRef.current = setTimeout(() => {
-      lastAvatarTapRef.current = 0;
-    }, 500);
-  }, [triggerHaptic]);
+    router.push("/(main)/profile");
+  }, [triggerHaptic, router]);
 
   return (
     <>
@@ -113,13 +95,23 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
           </View>
 
           <View style={styles.searchRow} pointerEvents="box-none">
-            <TextInput
-              placeholder={t("searchPlaceholder")}
-              placeholderTextColor="rgba(255,255,255,1)"
-              style={styles.search}
-              pointerEvents="auto"
-              onFocus={() => triggerHaptic()}
-            />
+            <TouchableOpacity
+              style={[styles.search, styles.searchButton]}
+              activeOpacity={1}
+              onPress={() => {
+                triggerHaptic();
+                router.push("/(main)/search");
+              }}
+              accessibilityRole="button"
+            >
+              <Text
+                style={{ color: "rgba(255,255,255,1)" }}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {t("searchPlaceholder")}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView
@@ -223,128 +215,6 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
           </ScrollView>
         </View>
       </View>
-
-      <Modal
-        visible={debugModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDebugModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Debug Info</Text>
-
-            <ScrollView style={styles.debugInfo}>
-              <Text style={styles.debugLabel}>Current URL</Text>
-              <Text style={styles.debugValue}>{pathname}</Text>
-
-              <Text style={styles.debugLabel}>User Profile State</Text>
-              <Text style={styles.debugValue}>
-                name: {`"${name || "(empty)"}"`}
-              </Text>
-
-              <Text style={[styles.debugLabel, { marginTop: 16 }]}>
-                Onboarding Status
-              </Text>
-              <Text
-                style={[
-                  styles.debugValue,
-                  { color: name ? "#34a853" : "#ff6b6b" },
-                ]}
-              >
-                {name
-                  ? "✅ Onboarding completed (name is set)"
-                  : "❌ Onboarding not completed (name is empty)"}
-              </Text>
-
-              <Text style={[styles.debugLabel, { marginTop: 16 }]}>
-                Current Route
-              </Text>
-              <Text style={[styles.debugValue, { color: "#0d7ff2" }]}>
-                {pathname.startsWith("/(onboarding)")
-                  ? "🟦 Onboarding"
-                  : "🟩 Main"}
-              </Text>
-
-              <Text style={[styles.debugLabel, { marginTop: 16 }]}>
-                Expected Route
-              </Text>
-              <Text
-                style={[
-                  styles.debugValue,
-                  { color: name ? "#34a853" : "#ff6b6b" },
-                ]}
-              >
-                {name
-                  ? "✅ Should be in (main)"
-                  : "❌ Should be in (onboarding)"}
-              </Text>
-
-              <Text style={[styles.debugLabel, { marginTop: 16 }]}>
-                Diagnosis
-              </Text>
-              <Text style={styles.debugValue}>
-                {name
-                  ? pathname.startsWith("/(main)")
-                    ? "✅ OK: User has name and is in (main)"
-                    : "🔴 MISMATCH: User has name but in onboarding!"
-                  : pathname.startsWith("/(onboarding)")
-                    ? "✅ OK: User has no name and is in onboarding"
-                    : "🔴 MISMATCH: User has no name but in (main)!"}
-              </Text>
-            </ScrollView>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.dangerButton]}
-                onPress={() => {
-                  setName("");
-                  setDebugModalVisible(false);
-                }}
-              >
-                <Text style={styles.buttonText}>🔄 Reset Name</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={() => {
-                  setName("TestUser");
-                  setDebugModalVisible(false);
-                }}
-              >
-                <Text style={styles.buttonText}>✅ Set Name</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: "#0d7ff2" }]}
-                onPress={() => {
-                  router.push("/(onboarding)/step1");
-                  setDebugModalVisible(false);
-                }}
-              >
-                <Text style={styles.buttonText}>→ Onboarding</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: "#34a853" }]}
-                onPress={() => {
-                  router.push("/(main)");
-                  setDebugModalVisible(false);
-                }}
-              >
-                <Text style={styles.buttonText}>→ Main</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setDebugModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 }
@@ -392,6 +262,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     color: "#fff",
     paddingHorizontal: 12,
+  },
+  searchButton: {
+    justifyContent: "center",
   },
   chips: { flexDirection: "row", marginBottom: 8 },
   chipsContent: { paddingRight: 20, alignItems: "center" },
