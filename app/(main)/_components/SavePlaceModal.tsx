@@ -1,3 +1,11 @@
+import {
+  HeartIcon,
+  HomeIcon,
+  SchoolIcon,
+  StarIcon,
+  TrashIcon,
+  WorkIcon,
+} from "@/assets/icons";
 import { Colors } from "@/constants/theme";
 import { usePosition } from "@/contexts/PositionContext";
 import { useUser } from "@/contexts/UserContext";
@@ -19,41 +27,10 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
-
-const HeartIcon = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="m480-120-58-53q-101-91-167-157T150-447q-39-51-54.5-97T80-639q0-104 70.5-174.5T325-884q55 0 105 25t88 71q38-46 88-71t105-25q104 0 174.5 70.5T956-639q0 49-15.5 95T886-447q-39 51-105 117T614-173l-58 53h-76Z" />
-  </Svg>
-);
-
-const StarIcon = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="m233-120 65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Z" />
-  </Svg>
-);
-
-const SchoolIcon = ({ color = "#e3e3e3" }) => (
-  <Svg height={24} viewBox="0 -960 960 960" width={24} fill={color}>
-    <Path d="M242-249q-20-11-31-29.5T200-320v-192l-96-53q-11-6-16-15t-5-20q0-11 5-20t16-15l338-184q9-5 18.5-7.5T480-829q10 0 19.5 2.5T518-819l381 208q10 5 15.5 14.5T920-576v256q0 17-11.5 28.5T880-280q-17 0-28.5-11.5T840-320v-236l-80 44v192q0 23-11 41.5T718-249L518-141q-9 5-18.5 7.5T480-131q-10 0-19.5-2.5T442-141L242-249Zm238-203 274-148-274-148-274 148 274 148Zm0 241 200-108v-151l-161 89q-9 5-19 7.5t-20 2.5q-10 0-20-2.5t-19-7.5l-161-89v151l200 108Zm0-241Zm0 121Zm0 0Z" />
-  </Svg>
-);
-
-const HomeIconSelect = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="M160-120v-480l320-240 320 240v480H560v-280H400v280H160Z" />
-  </Svg>
-);
-
-const WorkIconSelect = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z" />
-  </Svg>
-);
 
 const PlaceIcons = [
-  { id: "home", icon: HomeIconSelect },
-  { id: "work", icon: WorkIconSelect },
+  { id: "work", icon: WorkIcon },
+  { id: "home", icon: HomeIcon },
   { id: "heart", icon: HeartIcon },
   { id: "star", icon: StarIcon },
   { id: "school", icon: SchoolIcon },
@@ -192,14 +169,7 @@ export const SavePlaceModal: React.FC<SavePlaceModalProps> = ({
                 <Text style={styles.title}>{modalTitle}</Text>
                 {isEditing && (
                   <TouchableOpacity onPress={handleDelete}>
-                    <Svg
-                      width={24}
-                      height={24}
-                      viewBox="0 -960 960 960"
-                      fill="#f55"
-                    >
-                      <Path d="M280-120q-33 0-56.5-23.5T200-200v-520q-17 0-28.5-11.5T160-760q0-17 11.5-28.5T200-800h160q0-17 11.5-28.5T400-840h160q17 0 28.5 11.5T600-800h160q17 0 28.5 11.5T800-760q0 17-11.5 28.5T760-720v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM428.5-291.5Q440-303 440-320v-280q0-17-11.5-28.5T400-640q-17 0-28.5 11.5T360-600v280q0 17 11.5 28.5T400-280q17 0 28.5-11.5Zm160 0Q600-303 600-320v-280q0-17-11.5-28.5T560-640q-17 0-28.5 11.5T520-600v280q0 17 11.5 28.5T560-280q17 0 28.5-11.5ZM280-720v520-520Z" />
-                    </Svg>
+                    <TrashIcon />
                   </TouchableOpacity>
                 )}
               </View>

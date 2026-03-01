@@ -3,13 +3,38 @@ import { MapLayersContext } from "@/components/map/MapLayersContext";
 import React, { useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
-interface Props {
+import {
+  departureSvg,
+  destinationSvg,
+  waypointSvg,
+} from "@/assets/icons/svgStrings";
+
+export type WaypointPin = {
   lat: number;
   lng: number;
+  type: "departure" | "waypoint" | "destination";
+  stepNumber?: number;
+};
+
+interface Props {
+  pins?: WaypointPin[];
+  routeCoords?: { latitude: number; longitude: number }[];
+  lat?: number;
+  lng?: number;
   zoom?: number;
+  interactive?: boolean;
+  style?: any;
 }
 
-function MapSnapshotInner({ lat, lng, zoom = 11 }: Props) {
+function MapSnapshotInner({
+  pins,
+  routeCoords,
+  lat,
+  lng,
+  zoom = 11,
+  interactive = false,
+  style,
+}: Props) {
   const ref = useRef<any>(null);
   const [mapReady, setMapReady] = React.useState(false);
   const ctx = React.useContext(MapLayersContext);
@@ -29,22 +54,139 @@ function MapSnapshotInner({ lat, lng, zoom = 11 }: Props) {
     } catch {}
   };
 
+  const lastKey = React.useRef("");
+  const lastLayer = React.useRef("");
+
+  React.useEffect(() => {
+    if (!mapReady) {
+      lastKey.current = "";
+      lastLayer.current = "";
+    }
+  }, [mapReady]);
+
   React.useEffect(() => {
     if (!mapReady) return;
-    post({ type: "zoomTo", lat, lng, zoom, animate: false });
-    post({ type: "setUserMarker", lat, lng, icon: "address" });
-    const theme = layers && layers.darkTheme ? "dark" : "light";
-    post({ type: "setBaseLayer", layer: layers.mapType, theme });
-    post({ type: "zoomBy", delta: 0 });
-  }, [mapReady, lat, lng, zoom, layers]);
+
+    const layerKey = `${layers?.mapType ?? "standard"}-${layers?.darkTheme ? "dark" : "light"}`;
+    if (layerKey !== lastLayer.current) {
+      lastLayer.current = layerKey;
+      const theme = layers?.darkTheme ? "dark" : "light";
+      post({
+        type: "setBaseLayer",
+        layer: layers?.mapType ?? "standard",
+        theme,
+      });
+    }
+
+    if (pins && pins.length > 0) {
+      const routeFingerprint =
+        routeCoords && routeCoords.length >= 2
+          ? `${routeCoords[0].latitude},${routeCoords[0].longitude}:${routeCoords[routeCoords.length - 1].latitude},${routeCoords[routeCoords.length - 1].longitude}:${routeCoords.length}`
+          : "0";
+      const key = JSON.stringify(pins) + routeFingerprint;
+      if (key === lastKey.current) return;
+      lastKey.current = key;
+
+      post({ type: "clearMarkers" });
+      post({ type: "clearPolyline" });
+
+      const valid = pins.filter((p) => p.lat && p.lng);
+      if (valid.length === 0) return;
+
+      if (routeCoords && routeCoords.length >= 2) {
+        post({
+          type: "setPolyline",
+          latlngs: routeCoords.map((c) => [c.latitude, c.longitude]),
+          color: "#0d7ff2",
+          weight: 2,
+          opacity: 0.85,
+        });
+      } else if (valid.length >= 2) {
+        post({
+          type: "setPolyline",
+          latlngs: valid.map((p) => [p.lat, p.lng]),
+          color: "#0d7ff2",
+          weight: 2.5,
+          opacity: 0.8,
+        });
+      }
+
+      let stepIdx = 1;
+      valid.forEach((p) => {
+        if (p.type === "departure") {
+          post({
+            type: "addMarker",
+            lat: p.lat,
+            lng: p.lng,
+            html: departureSvg(),
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          });
+        } else if (p.type === "destination") {
+          post({
+            type: "addMarker",
+            lat: p.lat,
+            lng: p.lng,
+            html: destinationSvg(),
+            iconSize: [22, 22],
+            iconAnchor: [4, 22],
+          });
+        } else {
+          const n = p.stepNumber ?? stepIdx++;
+          post({
+            type: "addMarker",
+            lat: p.lat,
+            lng: p.lng,
+            html: waypointSvg(n),
+            iconSize: [24, 30],
+            iconAnchor: [12, 30],
+          });
+        }
+      });
+
+      if (valid.length >= 2) {
+        const lats = valid.map((p) => p.lat);
+        const lngs = valid.map((p) => p.lng);
+        post({
+          type: "fitBounds",
+          bounds: [
+            [Math.min(...lats), Math.min(...lngs)],
+            [Math.max(...lats), Math.max(...lngs)],
+          ],
+          padding: [32, 32],
+        });
+      } else {
+        post({
+          type: "zoomTo",
+          lat: valid[0].lat,
+          lng: valid[0].lng,
+          zoom: 13,
+          animate: false,
+        });
+      }
+      return;
+    }
+
+    if (lat != null && lng != null) {
+      post({ type: "zoomTo", lat, lng, zoom, animate: false });
+      post({ type: "setUserMarker", lat, lng, icon: "address" });
+    }
+  }, [mapReady, pins, routeCoords, lat, lng, zoom, layers]);
 
   const handleMapMsg = React.useCallback((msg: any) => {
     if (msg?.type === "mapReady") setMapReady(true);
   }, []);
 
   return (
-    <View style={styles.container} pointerEvents="none">
-      <ShadcnMap ref={ref} initialZoom={zoom} onMapMessage={handleMapMsg} />
+    <View
+      style={[styles.container, style]}
+      pointerEvents={interactive ? "auto" : "none"}
+    >
+      <ShadcnMap
+        ref={ref}
+        initialZoom={pins && pins.length > 0 ? 2 : zoom}
+        onMapMessage={handleMapMsg}
+      />
     </View>
   );
 }

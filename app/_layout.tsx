@@ -1,14 +1,14 @@
+import { AppLogoIcon } from "@/assets/icons";
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider,
 } from "@react-navigation/native";
 import { Slot, usePathname, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
 import { HapticSettingsProvider } from "../contexts/HapticSettingsContext";
 import { PermissionsProvider } from "../contexts/PermissionsContext";
 import { UserProvider, useUser } from "../contexts/UserContext";
@@ -21,12 +21,7 @@ function SplashScreenOverlay() {
   return (
     <View style={styles.splashContainer}>
       <View style={styles.logoContainer}>
-        <Svg width={60} height={60} viewBox="0 -960 960 960">
-          <Path
-            d="M480-240 222-130q-13 5-24.5 2.5T178-138q-8-8-10.5-20t2.5-25l273-615q5-12 15.5-18t21.5-6q11 0 21.5 6t15.5 18l273 615q5 13 2.5 25T782-138q-8 8-19.5 10.5T738-130L480-240Z"
-            fill="#0d7ff2"
-          />
-        </Svg>
+        <AppLogoIcon width={60} height={60} />
       </View>
     </View>
   );

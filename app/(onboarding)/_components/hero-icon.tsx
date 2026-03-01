@@ -1,8 +1,8 @@
+import HeroPattern from "@/assets/icons/HeroPattern";
 import { Colors } from "@/constants/theme";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
-import Svg, { Circle, Defs, Pattern, Rect } from "react-native-svg";
 
 export default function HeroIcon() {
   const primary = useThemeColor({ dark: Colors.dark.primary }, "text");
@@ -12,19 +12,7 @@ export default function HeroIcon() {
   return (
     <View style={styles.wrapper}>
       <View style={styles.pattern}>
-        <Svg width="100%" height="100%">
-          <Defs>
-            <Pattern
-              id="dots"
-              patternUnits="userSpaceOnUse"
-              width={20}
-              height={20}
-            >
-              <Circle cx={1} cy={1} r={1} fill="rgba(255, 255, 255, 0.8)" />
-            </Pattern>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#dots)" />
-        </Svg>
+        <HeroPattern />
       </View>
       <View
         style={[styles.container, { backgroundColor: bg, borderColor: border }]}

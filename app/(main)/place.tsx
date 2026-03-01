@@ -72,8 +72,7 @@ export default function PlaceDetailScreen() {
           parseInt(osm_id as string),
         );
         setDetails(data);
-      } catch (error) {
-        console.error("Failed to fetch place details:", error);
+      } catch {
       } finally {
         setLoading(false);
       }

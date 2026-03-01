@@ -149,8 +149,7 @@ export default class FreePlaceDetailsService {
       }
 
       return details;
-    } catch (e) {
-      console.error("Error :", e);
+    } catch {
       return null;
     }
   }

@@ -1,3 +1,4 @@
+import { CenterUserIcon, LayersIcon } from "@/assets/icons";
 import { useHapticSettings } from "@/contexts/HapticSettingsContext";
 import { usePosition } from "@/contexts/PositionContext";
 import { snapPointsPercent } from "@/utils/snapPoints";
@@ -6,15 +7,14 @@ import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
 import LayersPanel from "./LayersPanel";
 import { useMap } from "./MapContext";
 import { useMapLayers } from "./MapLayersContext";
@@ -125,12 +125,7 @@ export default function Controls() {
                 centerOnUser();
               }}
             >
-              <Svg width={24} height={24} viewBox="0 -960 960 960">
-                <Path
-                  d="M440-82v-40q-125-14-214.5-103.5T122-440H82q-17 0-28.5-11.5T42-480q0-17 11.5-28.5T82-520h40q14-125 103.5-214.5T440-838v-40q0-17 11.5-28.5T480-918q17 0 28.5 11.5T520-878v40q125 14 214.5 103.5T838-520h40q17 0 28.5 11.5T918-480q0 17-11.5 28.5T878-440h-40q-14 125-103.5 214.5T520-122v40q0 17-11.5 28.5T480-42q-17 0-28.5-11.5T440-82Zm238-200q82-82 82-198t-82-198q-82-82-198-82t-198 82q-82 82-82 198t82 198q82 82 198 82t198-82Zm-311-85q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47Zm169.5-56.5Q560-447 560-480t-23.5-56.5Q513-560 480-560t-56.5 23.5Q400-513 400-480t23.5 56.5Q447-400 480-400t56.5-23.5ZM480-480Z"
-                  fill={followUser ? "#0d7ff2" : iconColor}
-                />
-              </Svg>
+              <CenterUserIcon active={followUser} />
             </TouchableOpacity>
           </BlurView>
 
@@ -148,12 +143,7 @@ export default function Controls() {
                 layers.openLayers();
               }}
             >
-              <Svg width={24} height={24} viewBox="0 -960 960 960">
-                <Path
-                  d="M161-366q-16-12-15.5-31.5T162-429q11-8 24-8t24 8l270 209 270-209q11-8 24-8t24 8q16 12 16.5 31.5T799-366L529-156q-22 17-49 17t-49-17L161-366Zm270 8L201-537q-31-24-31-63t31-63l230-179q22-17 49-17t49 17l230 179q31 24 31 63t-31 63L529-358q-22 17-49 17t-49-17Zm49-64 230-178-230-178-230 178 230 178Zm0-178Z"
-                  fill={iconColor}
-                />
-              </Svg>
+              <LayersIcon />
             </TouchableOpacity>
           </BlurView>
         </View>

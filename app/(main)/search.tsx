@@ -6,18 +6,44 @@ import { createTranslator } from "@/i18n";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
-    ImageBackground,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ImageBackground,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-import Svg, { Path } from "react-native-svg";
+import {
+  AddPlaceIcon,
+  AddressIcon,
+  AmenityIcon,
+  ArrowRightIcon,
+  AvatarIcon,
+  BatimentIcon,
+  BusStopIcon,
+  CoffeeIcon,
+  CommercialIcon,
+  EditIcon,
+  EvIcon,
+  FoodIcon,
+  GasIcon,
+  HealthIcon,
+  HistoryIcon,
+  HomeIcon,
+  ParkingIcon,
+  SchoolIcon,
+  SearchIcon,
+  StarIcon,
+  TrainStationIcon,
+  WorkIcon,
+} from "@/assets/icons";
 
+import BackIcon from "@/assets/icons/BackIcon";
+import BookmarkIcon from "@/assets/icons/BookmarkIcon";
+import CompassIcon from "@/assets/icons/CompassIcon";
 import MapSnapshot from "@/components/MapSnapshot";
 import OverPassAmenityList from "../../assets/config/poiList";
 import activityImg from "../../assets/images/search/explore/activity.png";
@@ -29,144 +55,17 @@ import shoppingImg from "../../assets/images/search/explore/shopping.png";
 import socialImg from "../../assets/images/search/explore/social.png";
 import topDiningImg from "../../assets/images/search/explore/topDining.png";
 import {
-    PhotonFeature,
-    SearchEngineService,
+  PhotonFeature,
+  SearchEngineService,
 } from "../../services/SearchEngineService";
 
-const GasIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960">
-    <Path
-      d="M160-160v-600q0-33 23.5-56.5T240-840h240q33 0 56.5 23.5T560-760v280h40q33 0 56.5 23.5T680-400v180q0 17 11.5 28.5T720-180q17 0 28.5-11.5T760-220v-288q-9 5-19 6.5t-21 1.5q-42 0-71-29t-29-71q0-32 17.5-57.5T684-694l-63-63q-9-9-9-21t9-21q8-8 20.5-8.5T663-800l127 124q15 15 22.5 35t7.5 41v380q0 42-29 71t-71 29q-42 0-71-29t-29-71v-200h-60v260q0 17-11.5 28.5T520-120H200q-17 0-28.5-11.5T160-160Zm80-400h240v-200H240v200Zm480 0q17 0 28.5-11.5T760-600q0-17-11.5-28.5T720-640q-17 0-28.5 11.5T680-600q0 17 11.5 28.5T720-560ZM240-200h240v-280H240v280Zm240 0H240h240Z"
-      fill="#e3e3e3"
-    />
-  </Svg>
-);
-
-const ParkingIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960">
-    <Path
-      d="M400-360v160q0 33-23.5 56.5T320-120q-33 0-56.5-23.5T240-200v-560q0-33 23.5-56.5T320-840h200q100 0 170 70t70 170q0 100-70 170t-170 70H400Zm0-160h128q33 0 56.5-23.5T608-600q0-33-23.5-56.5T528-680H400v160Z"
-      fill="#e3e3e3"
-    />
-  </Svg>
-);
-
-const CoffeeIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960">
-    <Path
-      d="M440-240q-117 0-198.5-81.5T160-520v-240q0-33 23.5-56.5T240-840h500q58 0 99 41t41 99q0 58-41 99t-99 41h-20v40q0 117-81.5 198.5T440-240ZM240-640h400v-120H240v120Zm200 320q83 0 141.5-58.5T640-520v-40H240v40q0 83 58.5 141.5T440-320Zm280-320h20q25 0 42.5-17.5T800-700q0-25-17.5-42.5T740-760h-20v120ZM200-120q-17 0-28.5-11.5T160-160q0-17 11.5-28.5T200-200h560q17 0 28.5 11.5T800-160q0 17-11.5 28.5T760-120H200Zm240-440Z"
-      fill="#e3e3e3"
-    />
-  </Svg>
-);
-
-const EvIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960">
-    <Path
-      d="M240-560h240v-200H240v200Zm0 360h240v-280H240v280Zm240 0H240h240Zm40 80H200q-17 0-28.5-11.5T160-160v-600q0-33 23.5-56.5T240-840h240q33 0 56.5 23.5T560-760v280h50q29 0 49.5 20.5T680-410v185q0 17 14 31t31 14q18 0 31.5-14t13.5-31v-375h-10q-17 0-28.5-11.5T720-640v-60q0-8 6-14t14-6v-40q0-8 6-14t14-6q8 0 14 6t6 14v40h40v-40q0-8 6-14t14-6q8 0 14 6t6 14v40q8 0 14 6t6 14v60q0 17-11.5 28.5T840-600h-10v375q0 42-30.5 73.5T725-120q-43 0-74-31.5T620-225v-185q0-5-2.5-7.5T610-420h-50v260q0 17-11.5 28.5T520-120Zm-180-80 100-160h-60v-120L280-320h60v120Z"
-      fill="#e3e3e3"
-    />
-  </Svg>
-);
-
-const FoodIcon = () => (
-  <Svg height={24} viewBox="0 -960 960 960" width={24} fill="#e3e3e3">
-    <Path
-      fill="#e3e3e3"
-      d="M280-600v-240q0-17 11.5-28.5T320-880q17 0 28.5 11.5T360-840v240h40v-240q0-17 11.5-28.5T440-880q17 0 28.5 11.5T480-840v240q0 56-34.5 98T360-446v326q0 17-11.5 28.5T320-80q-17 0-28.5-11.5T280-120v-326q-51-14-85.5-56T160-600v-240q0-17 11.5-28.5T200-880q17 0 28.5 11.5T240-840v240h40Zm400 200h-80q-17 0-28.5-11.5T560-440v-240q0-70 51.5-135T718-880q18 0 30 14t12 33v713q0 17-11.5 28.5T720-80q-17 0-28.5-11.5T680-120v-280Z"
-    />
-  </Svg>
-);
-
-const AmenityIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960">
-    <Path
-      fill="#fff"
-      d="M461-122.5q-9-4.5-15-14.5L265-439q-6-10-9-20t-3-21q0-11 3-21t9-20l181-302q6-10 15-14.5t19-4.5q10 0 19 4.5t15 14.5l181 302q6 10 9 20t3 21q0 11-3 21t-9 20L514-137q-6 10-15 14.5t-19 4.5q-10 0-19-4.5ZM480-236l147-244-147-244-147 244 147 244Zm0-244Z"
-    />
-  </Svg>
-);
-
-const AddressIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M480-186q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm-28 74q-14-5-25-15-65-60-115-117t-83.5-110.5q-33.5-53.5-51-103T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 45-17.5 94.5t-51 103Q698-301 648-244T533-127q-11 10-25 15t-28 5q-14 0-28-5Zm28-448Zm56.5 56.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5Z" />
-  </Svg>
-);
-
-const BusStopIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M320-200v20q0 25-17.5 42.5T260-120q-25 0-42.5-17.5T200-180v-62q-18-20-29-44.5T160-340v-380q0-83 77-121.5T480-880q172 0 246 37t74 123v380q0 29-11 53.5T760-242v62q0 25-17.5 42.5T700-120q-25 0-42.5-17.5T640-180v-20H320Zm162-560h224-448 224Zm158 280H240h480-80Zm-400-80h480v-120H240v120Zm142.5 222.5Q400-355 400-380t-17.5-42.5Q365-440 340-440t-42.5 17.5Q280-405 280-380t17.5 42.5Q315-320 340-320t42.5-17.5Zm280 0Q680-355 680-380t-17.5-42.5Q645-440 620-440t-42.5 17.5Q560-405 560-380t17.5 42.5Q595-320 620-320t42.5-17.5ZM258-760h448q-15-17-64.5-28.5T482-800q-107 0-156.5 12.5T258-760Zm62 480h320q33 0 56.5-23.5T720-360v-120H240v120q0 33 23.5 56.5T320-280Z" />
-  </Svg>
-);
-
-const TrainStationIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M300-200q-59 0-99.5-40.5T160-340v-380q0-83 77-121.5T480-880q172 0 246 37t74 123v380q0 59-40.5 99.5T660-200l65 43q12 8 8 22.5T714-120H246q-15 0-19-14.5t8-22.5l65-43Zm-60-360h200v-120H240v120Zm420 80H240h480-60Zm-140-80h200v-120H520v120ZM382.5-337.5Q400-355 400-380t-17.5-42.5Q365-440 340-440t-42.5 17.5Q280-405 280-380t17.5 42.5Q315-320 340-320t42.5-17.5Zm280 0Q680-355 680-380t-17.5-42.5Q645-440 620-440t-42.5 17.5Q560-405 560-380t17.5 42.5Q595-320 620-320t42.5-17.5ZM300-280h360q26 0 43-17t17-43v-140H240v140q0 26 17 43t43 17Zm180-520q-86 0-142.5 10T258-760h448q-18-20-74.5-30T480-800Zm0 40h226-448 222Z" />
-  </Svg>
-);
-
-const HeartIcon = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="m480-120-58-53q-101-91-167-157T150-447q-39-51-54.5-97T80-639q0-104 70.5-174.5T325-884q55 0 105 25t88 71q38-46 88-71t105-25q104 0 174.5 70.5T956-639q0 49-15.5 95T886-447q-39 51-105 117T614-173l-58 53h-76Z" />
-  </Svg>
-);
-
-const StarIcon = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="m233-120 65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Z" />
-  </Svg>
-);
-
-const SchoolIcon = ({ color = "#e3e3e3" }) => (
-  <Svg height={24} viewBox="0 -960 960 960" width={24} fill={color}>
-    <Path d="M242-249q-20-11-31-29.5T200-320v-192l-96-53q-11-6-16-15t-5-20q0-11 5-20t16-15l338-184q9-5 18.5-7.5T480-829q10 0 19.5 2.5T518-819l381 208q10 5 15.5 14.5T920-576v256q0 17-11.5 28.5T880-280q-17 0-28.5-11.5T840-320v-236l-80 44v192q0 23-11 41.5T718-249L518-141q-9 5-18.5 7.5T480-131q-10 0-19.5-2.5T442-141L242-249Zm238-203 274-148-274-148-274 148 274 148Zm0 241 200-108v-151l-161 89q-9 5-19 7.5t-20 2.5q-10 0-20-2.5t-19-7.5l-161-89v151l200 108Zm0-241Zm0 121Zm0 0Z" />
-  </Svg>
-);
-
-const CommercialIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M201-120q-33 0-56.5-23.5T121-200v-318q-23-21-35.5-54t-.5-72l42-136q8-26 28.5-43t47.5-17h556q27 0 47 16.5t29 43.5l42 136q12 39-.5 71T841-518v318q0 33-23.5 56.5T761-120H201Zm368-440q27 0 41-18.5t11-41.5l-22-140h-78v148q0 21 14 36.5t34 15.5Zm-180 0q23 0 37.5-15.5T441-612v-148h-78l-22 140q-4 24 10.5 42t37.5 18Zm-178 0q18 0 31.5-13t16.5-33l22-154h-78l-40 134q-6 20 6.5 43t41.5 23Zm540 0q29 0 42-23t6-43l-42-134h-76l22 154q3 20 16.5 33t31.5 13ZM201-200h560v-282q-5 2-6.5 2H751q-27 0-47.5-9T663-518q-18 18-41 28t-49 10q-27 0-50.5-10T481-518q-17 18-39.5 28T393-480q-29 0-52.5-10T299-518q-21 21-41.5 29.5T211-480h-4.5q-2.5 0-5.5-2v282Zm560 0H201h560Z" />
-  </Svg>
-);
-
-const HealthIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M360-80q-33 0-56.5-23.5T280-160v-120H160q-33 0-56.5-23.5T80-360v-240q0-33 23.5-56.5T160-680h120v-120q0-33 23.5-56.5T360-880h240q33 0 56.5 23.5T680-800v120h120q33 0 56.5 23.5T880-600v240q0 33-23.5 56.5T800-280H680v120q0 33-23.5 56.5T600-80H360ZM160-520h200q10 0 19 5t14 13l35 52 54-162q4-12 14.5-20t23.5-8q10 0 19 5t14 13l68 102h179v-80H640q-17 0-28.5-11.5T600-640v-160H360v160q0 17-11.5 28.5T320-600H160v80Zm0 80v80h160q17 0 28.5 11.5T360-320v160h240v-160q0-17 11.5-28.5T640-360h160v-80H600q-10 0-19-5t-15-13l-34-52-54 162q-4 12-15 20t-24 8q-10 0-19-5t-14-13l-68-102H160Zm320-40Z" />
-  </Svg>
-);
-
-const HomeIconSelect = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="M160-120v-480l320-240 320 240v480H560v-280H400v280H160Z" />
-  </Svg>
-);
-
-const WorkIconSelect = ({ color = "#e3e3e3" }) => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill={color}>
-    <Path d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z" />
-  </Svg>
-);
-
 const PlaceIcons = [
-  { id: "home", icon: HomeIconSelect },
-  { id: "work", icon: WorkIconSelect },
-  { id: "heart", icon: HeartIcon },
+  { id: "home", icon: HomeIcon },
+  { id: "work", icon: WorkIcon },
+  { id: "heart", icon: HealthIcon },
   { id: "star", icon: StarIcon },
   { id: "school", icon: SchoolIcon },
 ];
-
-const EditIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M200-200h57l391-391-57-57-391 391v57Zm-40 80q-17 0-28.5-11.5T120-160v-97q0-16 6-30.5t17-25.5l505-504q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L313-143q-11 11-25.5 17t-30.5 6h-97Zm600-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z" />
-  </Svg>
-);
-
-const AddPlaceIcon = () => (
-  <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-    <Path d="M440-520v80q0 17 11.5 28.5T480-400q17 0 28.5-11.5T520-440v-80h80q17 0 28.5-11.5T640-560q0-17-11.5-28.5T600-600h-80v-80q0-17-11.5-28.5T480-720q-17 0-28.5 11.5T440-680v80h-80q-17 0-28.5 11.5T320-560q0 17 11.5 28.5T360-520h80Zm40 334q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm-28 74q-14-5-25-15-65-60-115-117t-83.5-110.5q-33.5-53.5-51-103T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 45-17.5 94.5t-51 103Q698-301 648-244T533-127q-11 10-25 15t-28 5q-14 0-28-5Zm28-448Z" />
-  </Svg>
-);
-
 const SearchResult: React.FC<{
   icon?: React.ReactNode;
   title: string;
@@ -182,9 +81,7 @@ const SearchResult: React.FC<{
     </View>
     {onArrowPress ? (
       <TouchableOpacity onPress={onArrowPress} hitSlop={8}>
-        <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-          <Path d="M680-624 244-188q-11 11-28 11t-28-11q-11-11-11-28t11-28l436-436H400q-17 0-28.5-11.5T360-720q0-17 11.5-28.5T400-760h320q17 0 28.5 11.5T760-720v320q0 17-11.5 28.5T720-360q-17 0-28.5-11.5T680-400v-224Z" />
-        </Svg>
+        <ArrowRightIcon />
       </TouchableOpacity>
     ) : null}
   </TouchableOpacity>
@@ -284,21 +181,14 @@ export default function SearchScreen() {
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Svg width={24} height={24} viewBox="0 -960 960 960" fill="#e3e3e3">
-              <Path d="m313-440 196 196q12 12 11.5 28T508-188q-12 11-28 11.5T452-188L188-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l264-264q11-11 27.5-11t28.5 11q12 12 12 28.5T508-715L313-520h447q17 0 28.5 11.5T800-480q0 17-11.5 28.5T760-440H313Z" />
-            </Svg>
+            <BackIcon />
           </TouchableOpacity>
           <Text style={styles.title}>{t("title")}</Text>
           <TouchableOpacity
             style={styles.avatar}
             onPress={() => router.push("/(main)/profile")}
           >
-            <Svg width={30} height={30} viewBox="0 -960 960 960">
-              <Path
-                d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-240v-32q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v32q0 33-23.5 56.5T720-160H240q-33 0-56.5-23.5T160-240Zm80 0h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm296.5-343.5Q560-607 560-640t-23.5-56.5Q513-720 480-720t-56.5 23.5Q400-673 400-640t23.5 56.5Q447-560 480-560t56.5-23.5ZM480-640Zm0 400Z"
-                fill={Colors.dark.primary}
-              />
-            </Svg>
+            <AvatarIcon />
           </TouchableOpacity>
         </View>
 
@@ -306,14 +196,7 @@ export default function SearchScreen() {
           {mode !== "saved" && (
             <View style={styles.searchBox}>
               <Text style={styles.searchIcon}>
-                <Svg
-                  width={24}
-                  height={24}
-                  viewBox="0 -960 960 960"
-                  fill="#90adcb"
-                >
-                  <Path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" />
-                </Svg>
+                <SearchIcon />
               </Text>
               <TextInput
                 autoFocus={initialMount.current}
@@ -412,14 +295,7 @@ export default function SearchScreen() {
                           .join(", ");
 
                     const PlaceIcon = noStreet ? (
-                      <Svg
-                        width={24}
-                        height={24}
-                        viewBox="0 -960 960 960"
-                        fill="#e3e3e3"
-                      >
-                        <Path d="M120-200v-400q0-33 23.5-56.5T200-680h160v-47q0-16 6-30.5t17-25.5l40-40q23-23 57-23t57 23l40 40q11 11 17 25.5t6 30.5v207h160q33 0 56.5 23.5T840-440v240q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200Zm80 0h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm240 320h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm0-160h80v-80h-80v80Zm240 480h80v-80h-80v80Zm0-160h80v-80h-80v80Z" />
-                      </Svg>
+                      <BatimentIcon />
                     ) : r.properties.osm_value === "bus_stop" ? (
                       <BusStopIcon />
                     ) : isStation ? (
@@ -514,31 +390,13 @@ export default function SearchScreen() {
                 </View>
 
                 <SearchResult
-                  icon={
-                    <Svg
-                      width={24}
-                      height={24}
-                      viewBox="0 -960 960 960"
-                      fill="#e3e3e3"
-                    >
-                      <Path d="M480-120q-126 0-223-76.5T131-392q-4-15 6-27.5t27-14.5q16-2 29 6t18 24q24 90 99 147t170 57q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h70q17 0 28.5 11.5T360-600q0 17-11.5 28.5T320-560H160q-17 0-28.5-11.5T120-600v-160q0-17 11.5-28.5T160-800q17 0 28.5 11.5T200-760v54q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm40-376 100 100q11 11 11 28t-11 28q-11 11-28 11t-28-11L452-452q-6-6-9-13.5t-3-15.5v-159q0-17 11.5-28.5T480-680q17 0 28.5 11.5T520-640v144Z" />
-                    </Svg>
-                  }
+                  icon={<HistoryIcon />}
                   title="1 rue de bonjour"
                   subtitle="issou, France"
                 />
 
                 <SearchResult
-                  icon={
-                    <Svg
-                      width={24}
-                      height={24}
-                      viewBox="0 -960 960 960"
-                      fill="#e3e3e3"
-                    >
-                      <Path d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z" />
-                    </Svg>
-                  }
+                  icon={<WorkIcon />}
                   title="La maison de cobra"
                   subtitle="Qq part, France"
                 />
@@ -716,7 +574,7 @@ export default function SearchScreen() {
                     <View style={{ flexDirection: "column", flex: 1 }}>
                       <View style={styles.favTitleRow}>
                         <View style={styles.favIconPlaceholder}>
-                          <HomeIconSelect color={Colors.dark.primary} />
+                          <HomeIcon color={Colors.dark.primary} />
                         </View>
                         <Text
                           style={[styles.favCardTitle, { flexShrink: 1 }]}
@@ -790,7 +648,7 @@ export default function SearchScreen() {
                     <View style={{ flexDirection: "column", flex: 1 }}>
                       <View style={styles.favTitleRow}>
                         <View style={styles.favIconPlaceholder}>
-                          <WorkIconSelect color={Colors.dark.primary} />
+                          <WorkIcon color={Colors.dark.primary} />
                         </View>
                         <Text
                           style={[styles.favCardTitle, { flexShrink: 1 }]}
@@ -932,16 +790,12 @@ export default function SearchScreen() {
             style={styles.navButton}
             onPress={() => setMode("explore")}
           >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 -960 960 960"
-              fill={mode === "explore" ? Colors.dark.primary : "#e3e3e3"}
-            >
-              <Path d="m335-310 202-58q20-6 34.5-20.5T592-423l58-202q3-11-5.5-19.5T625-650l-202 58q-20 6-34.5 20.5T368-537l-58 202q-3 11 5.5 19.5T335-310Zm145-110q-25 0-42.5-17.5T420-480q0-25 17.5-42.5T480-540q25 0 42.5 17.5T540-480q0 25-17.5 42.5T480-420Zm0 340q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q133 0 226.5-93.5T800-480q0-133-93.5-226.5T480-800q-133 0-226.5 93.5T160-480q0 133 93.5 226.5T480-160Zm0-320Z" />
-            </Svg>
+            <CompassIcon active={mode === "explore"} />
             <Text
-              style={styles.navLabel}
+              style={[
+                styles.navLabel,
+                mode === "explore" ? styles.navActive : {},
+              ]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -952,14 +806,7 @@ export default function SearchScreen() {
             style={styles.navButton}
             onPress={() => setMode("search")}
           >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 -960 960 960"
-              fill={mode === "search" ? Colors.dark.primary : "#e3e3e3"}
-            >
-              <Path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" />
-            </Svg>
+            <SearchIcon active={mode === "search"} />
             <Text
               style={[
                 styles.navLabel,
@@ -975,14 +822,7 @@ export default function SearchScreen() {
             style={styles.navButton}
             onPress={() => setMode("saved")}
           >
-            <Svg
-              width={24}
-              height={24}
-              viewBox="0 -960 960 960"
-              fill={mode === "saved" ? Colors.dark.primary : "#e3e3e3"}
-            >
-              <Path d="m480-240-168 72q-40 17-76-6.5T200-241v-519q0-33 23.5-56.5T280-840h400q33 0 56.5 23.5T760-760v519q0 43-36 66.5t-76 6.5l-168-72Zm0-88 200 86v-518H280v518l200-86Zm0-432H280h400-200Z" />
-            </Svg>
+            <BookmarkIcon active={mode === "saved"} />
             <Text
               style={[
                 styles.navLabel,

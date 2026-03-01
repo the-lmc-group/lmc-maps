@@ -1,0 +1,27 @@
+{
+  "modes": {
+    "car": { "label": "Voiture", "subtitle": "Via route principale" },
+    "walk": { "label": "À pied", "subtitle": "Chemin le plus court" },
+    "bike": { "label": "Vélo", "subtitle": "Pistes cyclables" },
+    "transit": { "label": "Transport", "subtitle": "Transports en commun" }
+  },
+  "destination": "Destination",
+  "currentPosition": "Position actuelle",
+  "choosePlace": "Choisir un lieu",
+  "availableAlternatives": "Variantes disponibles",
+  "fastest": "Le plus rapide",
+  "customDepartureInfo": "Départ personnalisé — navigation GPS indisponible",
+  "departure": "DÉPART",
+  "destinationLabel": "DESTINATION",
+  "save": "Enregistrer",
+  "saveNotEnough": "Ajoutez au moins 2 étapes"
+  ,
+  "addStop": "Ajouter une étape"
+  ,
+  "searchPlacePlaceholder": "Chercher un lieu…",
+  "myPositionTitle": "Ma position actuelle",
+  "useMyLocation": "Utiliser ma localisation GPS",
+  "place": "Lieu"
+  ,
+  "step": "ÉTAPE {{n}}"
+}

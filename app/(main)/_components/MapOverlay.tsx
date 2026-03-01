@@ -1,3 +1,11 @@
+import {
+  AppLogoIcon,
+  AvatarIcon,
+  HistoryIcon,
+  HomeIcon,
+  MoreIcon,
+  WorkIcon,
+} from "@/assets/icons";
 import { useHapticSettings } from "@/contexts/HapticSettingsContext";
 import { useUser } from "@/contexts/UserContext";
 import { createTranslator } from "@/i18n";
@@ -5,13 +13,13 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 interface MapOverlayProps {
   blockMap: boolean;
@@ -75,13 +83,53 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
     router.push("/(main)/profile");
   }, [triggerHaptic, router]);
 
+  const chips = React.useMemo(() => {
+    const list: {
+      id: string;
+      label: string;
+      icon: React.ReactNode;
+      onPress: () => void;
+    }[] = [];
+
+    if (saved.home) {
+      list.push({
+        id: "home",
+        label: t("chips.home"),
+        icon: <HomeIcon width={20} height={20} />,
+        onPress: () => handleChipPress("home"),
+      });
+    }
+    if (saved.work) {
+      list.push({
+        id: "work",
+        label: t("chips.work"),
+        icon: <WorkIcon width={20} height={20} />,
+        onPress: () => handleChipPress("work"),
+      });
+    }
+
+    list.push({
+      id: "recent",
+      label: t("chips.recent"),
+      icon: <HistoryIcon />,
+      onPress: () => handleChipPress("recent"),
+    });
+
+    list.push({
+      id: "more",
+      label: t("chips.more"),
+      icon: <MoreIcon />,
+      onPress: () => handleChipPress("more"),
+    });
+
+    return list;
+  }, [saved, t, handleChipPress]);
+
   return (
     <>
       <View
         style={styles.overlay}
-        pointerEvents="box-none"
-        onStartShouldSetResponderCapture={() => blockMap}
-        onMoveShouldSetResponderCapture={() => blockMap}
+        pointerEvents={blockMap ? "auto" : "box-none"}
       >
         <Svg height={320} style={styles.topGradient} pointerEvents="none">
           <Defs>
@@ -94,29 +142,19 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
         </Svg>
 
         <View style={styles.topArea} pointerEvents="auto">
-          <View style={styles.headerRow} pointerEvents="box-none">
-            <View style={styles.titleRow} pointerEvents="none">
+          <View style={styles.headerRow} pointerEvents="auto">
+            <View style={styles.titleRow} pointerEvents="auto">
               <View style={styles.logo}>
-                <Svg width={20} height={20} viewBox="0 -960 960 960">
-                  <Path
-                    d="M480-240 222-130q-13 5-24.5 2.5T178-138q-8-8-10.5-20t2.5-25l273-615q5-12 15.5-18t21.5-6q11 0 21.5 6t15.5 18l273 615q5 13 2.5 25T782-138q-8 8-19.5 10.5T738-130L480-240Z"
-                    fill="#fff"
-                  />
-                </Svg>
+                <AppLogoIcon width={20} height={20} fill="#fff" />
               </View>
               <Text style={styles.title}>LMC Maps</Text>
             </View>
             <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress}>
-              <Svg width={30} height={30} viewBox="0 -960 960 960">
-                <Path
-                  d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-240v-32q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v32q0 33-23.5 56.5T720-160H240q-33 0-56.5-23.5T160-240Zm80 0h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm296.5-343.5Q560-607 560-640t-23.5-56.5Q513-720 480-720t-56.5 23.5Q400-673 400-640t23.5 56.5Q447-560 480-560t56.5-23.5ZM480-640Zm0 400Z"
-                  fill="#fff"
-                />
-              </Svg>
+              <AvatarIcon />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchRow} pointerEvents="box-none">
+          <View style={styles.searchRow} pointerEvents="auto">
             <TouchableOpacity
               style={[styles.search, styles.searchButton]}
               activeOpacity={1}
@@ -145,99 +183,26 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
             nestedScrollEnabled={true}
             directionalLockEnabled={true}
           >
-            {saved.home && (
+            {chips.map((c, i) => (
               <TouchableOpacity
-                style={styles.chip}
-                onPress={() => handleChipPress("home")}
+                key={c.id}
+                style={[
+                  styles.chip,
+                  i !== chips.length - 1 && styles.chipSpacing,
+                ]}
+                onPress={c.onPress}
               >
-                <Svg width={20} height={20} viewBox="0 -960 960 960">
-                  <Path
-                    d="M240-200h120v-200q0-17 11.5-28.5T400-440h160q17 0 28.5 11.5T600-400v200h120v-360L480-740 240-560v360Zm-80 0v-360q0-19 8.5-36t23.5-28l240-180q21-16 48-16t48 16l240 180q15-11 23.5 28t8.5 36v360q0 33-23.5 56.5T720-120H560q-17 0-28.5-11.5T520-160v-200h-80v200q0 17-11.5 28.5T400-120H240q-33 0-56.5-23.5T160-200Zm320-270Z"
-                    fill="#fff"
-                  />
-                </Svg>
+                {c.icon}
 
                 <Text
                   style={styles.chipText}
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {t("chips.home")}
+                  {c.label}
                 </Text>
               </TouchableOpacity>
-            )}
-
-            {saved.work && (
-              <TouchableOpacity
-                style={styles.chip}
-                onPress={() => handleChipPress("work")}
-              >
-                <Svg width={20} height={20} viewBox="0 -960 960 960">
-                  <Path
-                    d="M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80ZM160-200v-440 440Z"
-                    fill="#fff"
-                  />
-                </Svg>
-
-                <Text
-                  style={styles.chipText}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {t("chips.work")}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.chip}
-              onPress={() => handleChipPress("recent")}
-            >
-              <Svg
-                width={20}
-                height={20}
-                viewBox="0 -960 960 960"
-                pointerEvents="none"
-              >
-                <Path
-                  d="m520-473 90 90q11 11 11 27.5T610-327q-12 12-28.5 12T553-327L452-428q-6-6-9-13.5t-3-15.5v-143q0-17 11.5-28.5T480-640q17 0 28.5 11.5T520-600v127Zm-68.5-258.5Q440-743 440-760v-40h80v40q0 17-11.5 28.5T480-720q-17 0-28.5-11.5Zm280 223Q743-520 760-520h40v80h-40q-17 0-28.5-11.5T720-480q0-17 11.5-28.5Zm-223 280Q520-217 520-200v40h-80v-40q0-17 11.5-28.5T480-240q17 0 28.5 11.5Zm-280-223Q217-440 200-440h-40v-80h40q17 0 28.5 11.5T240-480q0 17-11.5 28.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm320-400q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93q134 0 227-93t93-227Zm-320 0Z"
-                  fill="#fff"
-                />
-              </Svg>
-
-              <Text
-                style={styles.chipText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {t("chips.recent")}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.chip}
-              onPress={() => handleChipPress("more")}
-            >
-              <Svg
-                width={20}
-                height={20}
-                viewBox="0 -960 960 960"
-                pointerEvents="none"
-              >
-                <Path
-                  d="M480-160q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm0-240q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm0-240q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Z"
-                  fill="#fff"
-                />
-              </Svg>
-
-              <Text
-                style={styles.chipText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {t("chips.more")}
-              </Text>
-            </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
       </View>
@@ -292,7 +257,7 @@ const styles = StyleSheet.create({
   searchButton: {
     justifyContent: "center",
   },
-  chips: { flexDirection: "row", marginBottom: 8 },
+  chips: { flexDirection: "row", marginBottom: 8, gap: 12 },
   chipsContent: { paddingRight: 20, alignItems: "center" },
   chip: {
     flexDirection: "row",
@@ -301,7 +266,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
-    marginRight: 12,
     gap: 8,
   },
   chipText: { color: "#fff", fontSize: 14 },
@@ -353,8 +317,10 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
     alignItems: "center",
+  },
+  chipSpacing: {
+    marginRight: 12,
   },
   primaryButton: {
     backgroundColor: "#0d7ff2",

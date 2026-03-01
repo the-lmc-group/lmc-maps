@@ -1,16 +1,17 @@
+import { CarIcon, CloseIcon, MoonStarsIcon, TrainIcon } from "@/assets/icons";
+import SvgPathIcon from "@/assets/icons/SvgPathIcon";
 import { useHapticSettings } from "@/contexts/HapticSettingsContext";
 import { createTranslator } from "@/i18n";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
 import { useMapLayers } from "./MapLayersContext";
 
 interface LayersPanelProps {
@@ -64,12 +65,7 @@ export default function LayersPanel({ onClose }: LayersPanelProps) {
       <View style={styles.header}>
         <Text style={styles.title}>{t("layers.title")}</Text>
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Svg width={24} height={24} viewBox="0 -960 960 960">
-            <Path
-              d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
-              fill="#fff"
-            />
-          </Svg>
+          <CloseIcon />
         </TouchableOpacity>
       </View>
 
@@ -94,12 +90,10 @@ export default function LayersPanel({ onClose }: LayersPanelProps) {
                   layers.mapType === mapType.id && styles.mapTypeIconActive,
                 ]}
               >
-                <Svg width={24} height={24} viewBox="0 -960 960 960">
-                  <Path
-                    d={mapType.path}
-                    fill={layers.mapType === mapType.id ? "#000" : "#e3e3e3"}
-                  />
-                </Svg>
+                <SvgPathIcon
+                  d={mapType.path}
+                  fill={layers.mapType === mapType.id ? "#000" : "#e3e3e3"}
+                />
               </View>
               <Text
                 style={[
@@ -121,12 +115,7 @@ export default function LayersPanel({ onClose }: LayersPanelProps) {
           <View style={styles.detailRow}>
             <View style={styles.detailLeft}>
               <View style={styles.detailIcon}>
-                <Svg width={24} height={24} viewBox="0 -960 960 960">
-                  <Path
-                    d="M483-80q-84 0-157.5-32t-128-86.5Q143-253 111-326.5T79-484q0-124 68.5-225T331-857q14-5 29-3.5t25 9.5q8 7 12.5 19.5T402-799q2 79 32 150.5T520-521q56 56 128 86t151 32q21 0 32 3.5t18 11.5q8 10 10.5 26t-2.5 29q-46 115-148 184T483-80Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T463-465q-61-61-97-138t-43-163q-77 43-120.5 118.5T159-484q0 135 94.5 229.5T483-160Zm-20-305Zm109-203-64-64q-12-12-12-28t12-28l64-64q12-12 28-12t28 12l64 64q12 12 12 28t-12 28l-64 64q-12 12-28 12t-28-12Zm200 120-24-24q-12-12-12-28t12-28l24-24q12-12 28-12t28 12l24 24q12 12 12 28t-12 28l-24 24q-12 12-28 12t-28-12Z"
-                    fill="#e3e3e3"
-                  />
-                </Svg>
+                <MoonStarsIcon />
               </View>
               <Text style={styles.detailLabel}>{t("layers.darkMap")}</Text>
             </View>
@@ -148,12 +137,7 @@ export default function LayersPanel({ onClose }: LayersPanelProps) {
         <View style={styles.detailRow}>
           <View style={styles.detailLeft}>
             <View style={styles.detailIcon}>
-              <Svg width={24} height={24} viewBox="0 -960 960 960">
-                <Path
-                  d="M240-200v20q0 25-17.5 42.5T180-120q-25 0-42.5-17.5T120-180v-286q0-7 1-14t3-13l75-213q8-24 29-39t47-15h410q26 0 47 15t29 39l75 213q2 6 3 13t1 14v286q0 25-17.5 42.5T780-120q-25 0-42.5-17.5T720-180v-20H240Zm-8-360h496l-42-120H274l-42 120Zm-32 80v200-200Zm100 160q25 0 42.5-17.5T360-380q0-25-17.5-42.5T300-440q-25 0-42.5 17.5T240-380q0 25 17.5 42.5T300-320Zm360 0q25 0 42.5-17.5T720-380q0-25-17.5-42.5T660-440q-25 0-42.5 17.5T600-380q0 25 17.5 42.5T660-320Zm-460 40h560v-200H200v200Z"
-                  fill="#e3e3e3"
-                />
-              </Svg>
+              <CarIcon />
             </View>
             <Text style={styles.detailLabel}>{t("layers.traffic")}</Text>
           </View>
@@ -175,12 +159,7 @@ export default function LayersPanel({ onClose }: LayersPanelProps) {
         <View style={styles.detailRow}>
           <View style={styles.detailLeft}>
             <View style={styles.detailIcon}>
-              <Svg width={24} height={24} viewBox="0 -960 960 960">
-                <Path
-                  d="M160-340v-380q0-53 27.5-84.5t72.5-48q45-16.5 102.5-22T480-880q66 0 124.5 5.5t102 22q43.5 16.5 68.5 48t25 84.5v380q0 59-40.5 99.5T660-200l20 20q17 17 8 38.5T655-120q-7 0-13.5-2.5T630-130l-70-70H400l-70 70q-5 5-11.5 7.5T305-120q-23 0-32.5-21.5T280-180l20-20q-59 0-99.5-40.5T160-340Zm320-460q-106 0-155 12.5T258-760h448q-15-17-64.5-28.5T480-800ZM240-560h200v-120H240v120Zm420 80H240h480-60Zm-140-80h200v-120H520v120ZM383-337q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm280 0q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm-363 57h360q26 0 43-17t17-43v-140H240v140q0 26 17 43t43 17Zm180-480h226-448 222Z"
-                  fill="#e3e3e3"
-                />
-              </Svg>
+              <TrainIcon />
             </View>
             <Text style={styles.detailLabel}>
               {t("layers.publicTransport")}

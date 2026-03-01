@@ -1,0 +1,27 @@
+{
+  "modes": {
+    "car": { "label": "Car", "subtitle": "Via main roads" },
+    "walk": { "label": "Walk", "subtitle": "Shortest path" },
+    "bike": { "label": "Bike", "subtitle": "Cycle paths" },
+    "transit": { "label": "Transit", "subtitle": "Public transport" }
+  },
+  "destination": "Destination",
+  "currentPosition": "Current position",
+  "choosePlace": "Choose a place",
+  "availableAlternatives": "Available alternatives",
+  "fastest": "Fastest",
+  "customDepartureInfo": "Custom departure — GPS navigation unavailable",
+  "departure": "DEPARTURE",
+  "destinationLabel": "DESTINATION",
+  "save": "Save",
+  "saveNotEnough": "Add at least 2 stops"
+  ,
+  "addStop": "Add a stop"
+  ,
+  "searchPlacePlaceholder": "Search for a place…",
+  "myPositionTitle": "My current position",
+  "useMyLocation": "Use my GPS location",
+  "place": "Place"
+  ,
+  "step": "STEP {{n}}"
+}

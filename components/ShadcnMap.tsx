@@ -1,3 +1,4 @@
+import { addressSvg } from "@/assets/icons/svgStrings";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
@@ -9,6 +10,8 @@ type Props = {
 
 const ShadcnMap = React.forwardRef<any, Props>(
   ({ initialZoom = 2, onMapMessage }, ref) => {
+    const addressSvgString = addressSvg("#0d7ff2");
+
     const html: string = `<!doctype html>
   <html>
   <head>
@@ -59,6 +62,8 @@ const ShadcnMap = React.forwardRef<any, Props>(
       map.on('dragstart', sendMove);       
       map.on('zoomend', function(){ try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'zoomChanged', zoom: map.getZoom() })); } catch(e) {} });
       var userMarker = null;
+      var markers = [];
+      var routePolyline = null;
 
       function handleMessage(msg) {
         try {
@@ -78,7 +83,8 @@ const ShadcnMap = React.forwardRef<any, Props>(
             map.panTo([m.lat, m.lng], { animate: m.animate !== false, duration: m.duration || 0.6 });
           }
           if (m.type === 'fitBounds') {
-            map.fitBounds(m.bounds, { animate: m.animate !== false, duration: m.duration || 0.6 });
+            map.invalidateSize();
+            setTimeout(function(){ map.fitBounds(m.bounds, { animate: false, padding: m.padding || [24, 24] }); }, 120);
           }
           if (m.type === 'setUserMarker') {
             const lat = m.lat; const lng = m.lng;
@@ -89,7 +95,7 @@ const ShadcnMap = React.forwardRef<any, Props>(
               userMarker = null;
             }
             if (iconType === 'address') {
-              const svg = '<svg width="24" height="24" viewBox="0 -960 960 960" fill="#0d7ff2"><path d="M480-186q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm-28 74q-14-5-25-15-65-60-115-117t-83.5-110.5q-33.5-53.5-51-103T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 45-17.5 94.5t-51 103Q698-301 648-244T533-127q-11 10-25 15t-28 5q-14 0-28-5Zm28-448Zm56.5 56.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5Z" /></svg>';
+              const svg = ${JSON.stringify(addressSvgString)};
               const myIcon = L.divIcon({
                 className: '',
                 html: svg,
@@ -113,6 +119,26 @@ const ShadcnMap = React.forwardRef<any, Props>(
             if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
           }
           
+          if (m.type === 'clearMarkers') {
+            markers.forEach(function(mk){ map.removeLayer(mk); });
+            markers = [];
+          }
+          if (m.type === 'addMarker') {
+            var mIcon = L.divIcon({ className: '', html: m.html, iconSize: m.iconSize || [28,36], iconAnchor: m.iconAnchor || [14,36] });
+            var mk = L.marker([m.lat, m.lng], { icon: mIcon }).addTo(map);
+            markers.push(mk);
+          }
+          if (m.type === 'clearPolyline') {
+            if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+          }
+          if (m.type === 'setPolyline') {
+            if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+            if (m.latlngs && m.latlngs.length > 1) {
+              var polylineOpts = { color: m.color || '#0d7ff2', weight: m.weight || 2.5, opacity: m.opacity || 0.85 };
+              if (m.dashArray) polylineOpts.dashArray = m.dashArray;
+              routePolyline = L.polyline(m.latlngs, polylineOpts).addTo(map);
+            }
+          }
           if (m.type === 'setBaseLayer') {
             var layer = m.layer || 'standard';
             var theme = m.theme || 'dark';
