@@ -45,26 +45,41 @@ export function PositionProvider({ children }: { children: React.ReactNode }) {
 
   const animateTo = React.useCallback(
     (from: Position, to: Position, duration: number) => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
       const start = Date.now();
       const step = () => {
         const now = Date.now();
         const t = Math.min(1, (now - start) / duration);
-        setPosition({
+        const interpolated: Position = {
           latitude: from.latitude + (to.latitude - from.latitude) * t,
           longitude: from.longitude + (to.longitude - from.longitude) * t,
           speed: to.speed,
           heading: to.heading,
           city: to.city,
           country: to.country,
-        });
+        };
+
+        const prev = positionRef.current;
+        const latEq =
+          prev && Math.abs(prev.latitude - interpolated.latitude) < 1e-7;
+        const lonEq =
+          prev && Math.abs(prev.longitude - interpolated.longitude) < 1e-7;
+        const speedEq =
+          prev &&
+          (prev.speed === interpolated.speed ||
+            (prev.speed == null && interpolated.speed == null));
+
+        if (!prev || !latEq || !lonEq || !speedEq) {
+          setPosition(interpolated);
+        }
+
         if (t < 1) {
           animRef.current = requestAnimationFrame(step);
         } else {
           animRef.current = null;
         }
       };
-      step();
+      animRef.current = requestAnimationFrame(step);
     },
     [],
   );
@@ -205,7 +220,7 @@ export function PositionProvider({ children }: { children: React.ReactNode }) {
       active = false;
       stopWatching();
     };
-  }, [doRefresh, startWatching, stopWatching]);
+  }, []);
 
   const value = React.useMemo(
     () => ({

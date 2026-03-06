@@ -245,6 +245,8 @@ export default function StandardNavigationScreen() {
   const tripStartAtRef = React.useRef<number | null>(null);
   const tripDistanceMetersRef = React.useRef(0);
   const lastTripPointRef = React.useRef<Coordinate | null>(null);
+  const lastTripUpdateTimeRef = React.useRef(0);
+  const TRIP_UPDATE_INTERVAL_MS = 500;
   const [tripDurationSeconds, setTripDurationSeconds] = React.useState(0);
   const [tripDistanceMeters, setTripDistanceMeters] = React.useState(0);
   React.useEffect(() => {
@@ -335,12 +337,17 @@ export default function StandardNavigationScreen() {
     }
 
     lastTripPointRef.current = currentPoint;
-    setTripDistanceMeters(
-      Math.round(Math.max(0, tripDistanceMetersRef.current)),
-    );
-    setTripDurationSeconds(
-      Math.max(0, Math.round((now - tripStartAtRef.current) / 1000)),
-    );
+
+    const lastUpdate = lastTripUpdateTimeRef.current || 0;
+    if (now - lastUpdate >= TRIP_UPDATE_INTERVAL_MS) {
+      lastTripUpdateTimeRef.current = now;
+      setTripDistanceMeters(
+        Math.round(Math.max(0, tripDistanceMetersRef.current)),
+      );
+      setTripDurationSeconds(
+        Math.max(0, Math.round((now - (tripStartAtRef.current ?? now)) / 1000)),
+      );
+    }
   }, [position?.latitude, position?.longitude]);
 
   React.useEffect(() => {
@@ -420,7 +427,128 @@ export default function StandardNavigationScreen() {
           telemetryFeatureUsed("navigation_off_route", {
             distance_to_route_m: Math.round(distanceToRoute),
           });
+
+          offRouteRecalcInFlightRef.current = true;
+          lastOffRouteRecalcAtRef.current = now;
+
+          const performRecalc = async () => {
+            try {
+              let ok = false;
+              if (routeService.recalculateIfOffRoute) {
+                const res = await routeService.recalculateIfOffRoute(
+                  currentPos,
+                  serviceMode,
+                );
+                ok = res !== false && res !== null && res !== undefined;
+              } else {
+                const res = await routeService.getRoute(
+                  {
+                    latitude: currentPos.latitude,
+                    longitude: currentPos.longitude,
+                  },
+                  { latitude: destLat, longitude: destLng },
+                  serviceMode,
+                );
+                ok = !!res;
+              }
+
+              if (!ok) {
+                lastRecalcErrorAtRef.current = Date.now();
+              } else {
+                lastRecalcSuccessAtRef.current = Date.now();
+                waitingForRouteRef.current = false;
+                lastLeftPositionRef.current = null;
+
+                try {
+                  if (mapReady && routeService.routeCoords.length >= 2) {
+                    post({ type: "clearPolyline" });
+                    post({
+                      type: "setPolyline",
+                      latlngs: routeService.routeCoords.map((c) => [
+                        c.latitude,
+                        c.longitude,
+                      ]),
+                      color: "#0d7ff2",
+                      weight: 3,
+                      opacity: 0.8,
+                    });
+                  }
+                } catch {}
+              }
+            } catch {
+              lastRecalcErrorAtRef.current = Date.now();
+            } finally {
+              offRouteRecalcInFlightRef.current = false;
+            }
+          };
+
+          performRecalc();
+        } else {
+          if (
+            now - lastOffRouteRecalcAtRef.current >
+            OFF_ROUTE_RECALC_COOLDOWN_MS
+          ) {
+            if (routeService.isCalculating || offRouteRecalcInFlightRef.current)
+              return;
+
+            offRouteRecalcInFlightRef.current = true;
+            lastOffRouteRecalcAtRef.current = now;
+
+            const performRecalc = async () => {
+              try {
+                let ok = false;
+                if (routeService.recalculateIfOffRoute) {
+                  const res = await routeService.recalculateIfOffRoute(
+                    currentPos,
+                    serviceMode,
+                  );
+                  ok = res !== false && res !== null && res !== undefined;
+                } else {
+                  const res = await routeService.getRoute(
+                    {
+                      latitude: currentPos.latitude,
+                      longitude: currentPos.longitude,
+                    },
+                    { latitude: destLat, longitude: destLng },
+                    serviceMode,
+                  );
+                  ok = !!res;
+                }
+
+                if (!ok) {
+                  lastRecalcErrorAtRef.current = Date.now();
+                } else {
+                  lastRecalcSuccessAtRef.current = Date.now();
+                  waitingForRouteRef.current = false;
+                  lastLeftPositionRef.current = null;
+
+                  try {
+                    if (mapReady && routeService.routeCoords.length >= 2) {
+                      post({ type: "clearPolyline" });
+                      post({
+                        type: "setPolyline",
+                        latlngs: routeService.routeCoords.map((c) => [
+                          c.latitude,
+                          c.longitude,
+                        ]),
+                        color: "#0d7ff2",
+                        weight: 3,
+                        opacity: 0.8,
+                      });
+                    }
+                  } catch {}
+                }
+              } catch {
+                lastRecalcErrorAtRef.current = Date.now();
+              } finally {
+                offRouteRecalcInFlightRef.current = false;
+              }
+            };
+
+            performRecalc();
+          }
         }
+
         return;
       }
 
@@ -435,44 +563,6 @@ export default function StandardNavigationScreen() {
           }
         }
       }
-
-      offRouteRecalcInFlightRef.current = true;
-      lastOffRouteRecalcAtRef.current = now;
-
-      const performRecalc = async () => {
-        try {
-          let ok = false;
-          if (routeService.recalculateIfOffRoute) {
-            const res = await routeService.recalculateIfOffRoute(
-              currentPos,
-              serviceMode,
-            );
-            ok = res !== false && res !== null && res !== undefined;
-          } else {
-            const res = await routeService.getRoute(
-              {
-                latitude: currentPos.latitude,
-                longitude: currentPos.longitude,
-              },
-              { latitude: destLat, longitude: destLng },
-              serviceMode,
-            );
-            ok = !!res;
-          }
-
-          if (!ok) {
-            lastRecalcErrorAtRef.current = Date.now();
-          } else {
-            lastRecalcSuccessAtRef.current = Date.now();
-          }
-        } catch {
-          lastRecalcErrorAtRef.current = Date.now();
-        } finally {
-          offRouteRecalcInFlightRef.current = false;
-        }
-      };
-
-      performRecalc();
     };
 
     checkOffRouteAndRecalculate();
@@ -491,6 +581,7 @@ export default function StandardNavigationScreen() {
     routeService,
     routeService.routeCoords,
     routeService.isCalculating,
+    mapReady,
   ]);
 
   const sheetRef = React.useRef<BottomSheet>(null);
@@ -706,18 +797,27 @@ export default function StandardNavigationScreen() {
   const smoothedSpeedDiffRef = React.useRef(targetSpeedDiff);
 
   React.useEffect(() => {
-    if (limitNum === null) {
+    if (limitNum === null || !Number.isFinite(targetSpeedDiff)) {
       smoothedSpeedDiffRef.current = 0;
       setSmoothedSpeedDiff(0);
       return;
     }
 
-    let frameId = 0;
+    if (Math.abs(smoothedSpeedDiffRef.current - targetSpeedDiff) <= 0.05) {
+      smoothedSpeedDiffRef.current = targetSpeedDiff;
+      setSmoothedSpeedDiff(targetSpeedDiff);
+      return;
+    }
+
+    let frameId: number | null = null;
     const animate = () => {
-      const current = smoothedSpeedDiffRef.current;
-      const next = current + (targetSpeedDiff - current) * 0.12;
-      smoothedSpeedDiffRef.current = next;
-      setSmoothedSpeedDiff(next);
+      const prev = smoothedSpeedDiffRef.current;
+      const next = prev + (targetSpeedDiff - prev) * 0.12;
+
+      if (Math.abs(next - prev) > 1e-6) {
+        smoothedSpeedDiffRef.current = next;
+        setSmoothedSpeedDiff(next);
+      }
 
       if (Math.abs(targetSpeedDiff - next) > 0.05) {
         frameId = requestAnimationFrame(animate);
@@ -725,7 +825,9 @@ export default function StandardNavigationScreen() {
     };
 
     frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
+    return () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, [targetSpeedDiff, limitNum]);
 
   const isWarning =

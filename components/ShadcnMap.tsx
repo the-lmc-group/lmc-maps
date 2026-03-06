@@ -162,6 +162,14 @@ const ShadcnMap = React.forwardRef<any, Props>(
               applyBearing(m.bearing);
             }
           }
+          if (m.type === 'setTileBuffer') {
+            if (baseLayer && typeof m.buffer === 'number') {
+              baseLayer.options.keepBuffer = m.buffer;
+              if (map && map.options) {
+                map.options.keepBuffer = m.buffer;
+              }
+            }
+          }
           if (m.type === 'setBearing') {
             applyBearing(m.bearing || 0);
           }

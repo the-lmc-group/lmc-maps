@@ -117,7 +117,11 @@ export const SavePlaceModal: React.FC<SavePlaceModalProps> = ({
       lat: parseFloat(addrLat),
       lng: parseFloat(addrLng),
       name:
-        slot === "other" ? modalPlaceName : slot === "home" ? "Home" : "Work",
+        slot === "other"
+          ? modalPlaceName
+          : slot === "home"
+            ? t("card_home")
+            : t("card_work"),
       icon: slot === "other" ? modalSelectedIcon : slot,
     };
 

@@ -53,7 +53,7 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
         router.push({
           pathname: "/(main)/place",
           params: {
-            name: saved.home.name ?? "",
+            name: saved.home.name ?? t("chips.home"),
             address: saved.home.address,
             lat: String(saved.home.lat),
             lng: String(saved.home.lng),
@@ -63,7 +63,7 @@ export default function MapOverlay({ blockMap }: MapOverlayProps) {
         router.push({
           pathname: "/(main)/place",
           params: {
-            name: saved.work.name ?? "",
+            name: saved.work.name ?? t("chips.work"),
             address: saved.work.address,
             lat: String(saved.work.lat),
             lng: String(saved.work.lng),

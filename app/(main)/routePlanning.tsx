@@ -459,6 +459,9 @@ export default function RoutePlanningScreen() {
       >
     >
   >({});
+  const [routeErrors, setRouteErrors] = React.useState<
+    Partial<Record<TransportMode, string>>
+  >({});
 
   const [routeAlternatives, setRouteAlternatives] = React.useState<
     Partial<
@@ -779,6 +782,24 @@ export default function RoutePlanningScreen() {
 
       if (coords.length > 2) {
         await routeService.getMultiStepRoute(coords, navigationModeForIntent);
+      } else {
+        const selectedRoute = routeResults[navigationModeForIntent];
+        if (selectedRoute) {
+          routeService.updateRouteData({
+            routes: [
+              {
+                geometry: {
+                  coordinates: selectedRoute.coords.map((c) => [
+                    c.longitude,
+                    c.latitude,
+                  ]),
+                },
+                duration: selectedRoute.duration * 60,
+                distance: selectedRoute.distance,
+              },
+            ],
+          });
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -883,6 +904,9 @@ export default function RoutePlanningScreen() {
     if (key === lastFetchKey.current) return;
     lastFetchKey.current = key;
 
+    setRouteResults({});
+    setRouteErrors({});
+
     const modes: ("car" | "walk" | "bike")[] = ["car", "walk", "bike"];
     setModesCalculating({ car: true, walk: true, bike: true });
 
@@ -932,6 +956,10 @@ export default function RoutePlanningScreen() {
             telemetryFeatureUsed("route_calculation_no_alternatives", {
               mode,
             });
+            setRouteErrors((prev) => ({
+              ...prev,
+              [mode as TransportMode]: t("errorNoRoute"),
+            }));
           }
         } catch (error) {
           const errorMsg =
@@ -940,6 +968,10 @@ export default function RoutePlanningScreen() {
             mode,
             waypoint_count: resolvedCoords.length,
           });
+          setRouteErrors((prev) => ({
+            ...prev,
+            [mode as TransportMode]: errorMsg,
+          }));
         } finally {
           completed++;
           if (completed === modes.length) {
@@ -1384,9 +1416,11 @@ export default function RoutePlanningScreen() {
                       ? "—"
                       : modesCalculating[mode.id]
                         ? "…"
-                        : routeResults[mode.id]
-                          ? formatDuration(routeResults[mode.id]!.duration)
-                          : "—"}
+                        : routeErrors[mode.id]
+                          ? `status: ${routeErrors[mode.id]}`
+                          : routeResults[mode.id]
+                            ? formatDuration(routeResults[mode.id]!.duration)
+                            : "—"}
                   </Text>
                   <Text style={styles.modeDist}>
                     {mode.id !== "transit" && routeResults[mode.id]
@@ -1685,6 +1719,7 @@ const styles = StyleSheet.create({
   summaryRouteSep: { color: "#90adcb", fontSize: 13 },
   summaryRouteDist: { color: "#90adcb", fontSize: 13 },
   summaryRouteLoading: { color: "#90adcb", fontSize: 13, fontStyle: "italic" },
+  summaryRouteError: { color: "#ff6666", fontSize: 13 },
   summaryMap: {
     flex: 1,
     minHeight: 90,

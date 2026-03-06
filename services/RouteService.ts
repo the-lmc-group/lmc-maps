@@ -93,6 +93,7 @@ export interface RouteService {
   getNavigationData: () => NavigationData | null;
   isOffRoute: boolean;
   updateRouteData: (newRouteData: any) => void;
+  forceExtractCoordinates: () => void;
   isFromCache: boolean;
   getSpeedLimit: (points: Coordinate[]) => Promise<string | null>;
 }
@@ -409,10 +410,11 @@ export function useRouteService(): RouteService {
       timings.push(timing);
 
       if (!res.ok) {
+        const err = new Error(String(res.status));
         showRoutingError(
           "Service de calcul d'itinéraire temporairement indisponible",
         );
-        return { success: false, timings };
+        throw err;
       }
 
       const data = await res.json();
@@ -491,10 +493,11 @@ export function useRouteService(): RouteService {
       timings.push(timing);
 
       if (!res.ok) {
+        const err = new Error(String(res.status));
         showRoutingError(
           "Service de calcul d'itinéraire temporairement indisponible",
         );
-        return { success: false, timings };
+        throw err;
       }
 
       const data = await res.json();
@@ -528,7 +531,6 @@ export function useRouteService(): RouteService {
     mode = "driving",
   ) => {
     setRouteInfo(null);
-    setRouteCoords([]);
     setLastRawRouteData(null);
     setIsCalculating(true);
     setLastRequestTimings([]);
@@ -617,7 +619,6 @@ export function useRouteService(): RouteService {
   ) => {
     if (!waypoints || waypoints.length < 2) return false;
     setRouteInfo(null);
-    setRouteCoords([]);
     setLastRawRouteData(null);
     setIsCalculating(true);
     setLastRequestTimings([]);
@@ -695,7 +696,6 @@ export function useRouteService(): RouteService {
     if (!waypoints || waypoints.length < 2) return [];
 
     setRouteInfo(null);
-    setRouteCoords([]);
     setLastRawRouteData(null);
     setIsCalculating(true);
     setLastRequestTimings([]);
@@ -801,7 +801,6 @@ export function useRouteService(): RouteService {
     mode = "driving",
   ) => {
     setRouteInfo(null);
-    setRouteCoords([]);
     setLastRawRouteData(null);
     setIsCalculating(true);
     setLastRequestTimings([]);
@@ -927,12 +926,10 @@ export function useRouteService(): RouteService {
     const OFF_ROUTE_TOLERANCE = 20;
     const onRoute = isOnRoute(currentLocation, OFF_ROUTE_TOLERANCE);
     if (!onRoute) {
-      const nearestOnRoute = getNearestPointOnRoute(currentLocation);
-      const startForRecalc = nearestOnRoute || currentLocation;
-      const ok = await getHybridRoute(startForRecalc, destination, mode);
+      const ok = await getHybridRoute(currentLocation, destination, mode);
       if (ok) {
         setIsOffRoute(false);
-        return startForRecalc;
+        return currentLocation;
       }
       return false;
     }
@@ -1078,6 +1075,13 @@ export function useRouteService(): RouteService {
     }
   };
 
+  const forceExtractCoordinates = () => {
+    if (!lastRawRouteData) {
+      return;
+    }
+    updateRouteData(lastRawRouteData);
+  };
+
   const getSpeedLimit = async (
     points: Coordinate[],
   ): Promise<string | null> => {
@@ -1167,6 +1171,7 @@ export function useRouteService(): RouteService {
     getNavigationData,
     isOffRoute,
     updateRouteData,
+    forceExtractCoordinates,
     isFromCache,
     getSpeedLimit,
   };

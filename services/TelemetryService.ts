@@ -205,7 +205,6 @@ export class TelemetryService {
       const TELEMETRY_ENDPOINT = this.endpoint || "";
 
       if (!TELEMETRY_ENDPOINT) {
-        // endpoint not configured or telemetry disabled, skip sending
         return false;
       }
 

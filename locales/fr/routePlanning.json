@@ -33,5 +33,6 @@
   "route": "Route {{n}}",
   "viewPreview": "Voir l’aperçu",
   "startNavigation": "Démarrer la navigation",
-  "planner": "Planificateur"
+  "planner": "Planificateur",
+  "errorNoRoute": "aucun itinéraire trouvé"
 }
