@@ -13,6 +13,7 @@
       "bundleIdentifier": "com.anonymous.lmcmapsv3"
     },
     "android": {
+      "permissions": ["REQUEST_INSTALL_PACKAGES"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

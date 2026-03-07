@@ -31,7 +31,8 @@ export function UpdateDialog() {
       await downloadAndInstallAPK(apkAsset.browser_download_url, (p) =>
         setDownloadProgress(p),
       );
-    } catch (error) {
+    } catch {
+    } finally {
       setIsDownloading(false);
     }
   }, [releaseInfo]);

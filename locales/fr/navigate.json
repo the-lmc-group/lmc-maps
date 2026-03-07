@@ -71,6 +71,7 @@
     "downloading": "Téléchargement en cours",
     "downloadingDesc": "Veuillez patienter pendant le téléchargement et l'installation de la mise à jour...",
     "download": "Télécharger et installer",
-    "later": "Plus tard"
+    "later": "Plus tard",
+    "installUnknownAppsPermission": "Active \"Installer des applis inconnues\" pour Expo Go, puis réessaie."
   }
 }

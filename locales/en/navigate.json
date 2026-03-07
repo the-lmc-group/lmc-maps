@@ -70,6 +70,7 @@
     "downloading": "Downloading in progress",
     "downloadingDesc": "Please wait while the update is being downloaded and installed...",
     "download": "Download and install",
-    "later": "Later"
+    "later": "Later",
+    "installUnknownAppsPermission": "Enable \"Install unknown apps\" for Expo Go, then retry."
   }
 }
