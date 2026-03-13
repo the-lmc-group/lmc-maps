@@ -6,7 +6,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 import { Platform, ToastAndroid } from "react-native";
 
 const GITHUB_API_URL =
-  "https://api.github.com/repos/the-lmc-group/lmc-maps/releases/latest";
+  "https://api.github.com/repos/octarahq/lmc-maps/releases/latest";
 
 const FLAG_ACTIVITY_NEW_TASK = 0x10000000;
 const FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
